@@ -1,0 +1,156 @@
+# RFC 3261 Index
+
+# This index provides a searchable reference to RFC 3261 sections
+# Each entry contains: section number, title, file, and brief description
+
+sections:
+  - number: "1"
+    title: "Introduction"
+    file: "01-introduction.md"
+    description: "Introduction to SIP, applications, and five facets of session management"
+    keywords: ["intro", "overview", "capabilities"]
+
+  - number: "2"
+    title: "Overview of SIP Functionality"
+    file: "01-introduction.md"
+    description: "Overview of what SIP can do, protocols it works with"
+    keywords: ["overview", "capabilities", "rtp", "sdp"]
+
+  - number: "3"
+    title: "Terminology"
+    file: "01-introduction.md"
+    description: "RFC 2119 requirement levels (MUST, SHOULD, MAY) and key terms"
+    keywords: ["terminology", "must", "should", "may", "definitions"]
+
+  - number: "4"
+    title: "Overview of Operation"
+    file: "02-protocol-overview.md"
+    description: "Basic call flow example, SIP trapezoid, methods overview"
+    keywords: ["call flow", "invite", "proxy", "trapezoid"]
+
+  - number: "5"
+    title: "Structure of the Protocol"
+    file: "02-protocol-overview.md"
+    description: "Layered architecture: Transport, Transaction, TU layers"
+    keywords: ["layers", "architecture", "transaction"]
+
+  - number: "6"
+    title: "Definitions"
+    file: "02-protocol-overview.md"
+    description: "Core terms: AOR, B2BUA, Dialog, Proxy, Registrar, UAC, UAS"
+    keywords: ["definitions", "aor", "b2bua", "proxy", "registrar"]
+
+  - number: "7"
+    title: "SIP Messages"
+    file: "03-messages.md"
+    description: "Request/Response formats, header format, compact forms, bodies"
+    keywords: ["request", "response", "format", "headers", "compact"]
+
+  - number: "8"
+    title: "General User Agent Behavior"
+    file: "04-user-agent-behavior.md"
+    description: "UAC and UAS behavior: generating requests, processing responses"
+    keywords: ["uac", "uas", "behavior", "request", "response"]
+
+  - number: "9"
+    title: "Canceling a Request"
+    file: "04-user-agent-behavior.md"
+    description: "CANCEL method, how to cancel pending requests"
+    keywords: ["cancel", "cancelling"]
+
+  - number: "10"
+    title: "Registrations"
+    file: "05-registrations.md"
+    description: "REGISTER request, binding AOR to contact, Contact headers"
+    keywords: ["register", "registrar", "binding", "contact", "aor"]
+
+  - number: "11"
+    title: "Querying for Capabilities"
+    file: "05-registrations.md"
+    description: "OPTIONS method for capability queries"
+    keywords: ["options", "capabilities"]
+
+  - number: "12"
+    title: "Dialogs"
+    file: "06-dialogs.md"
+    description: "Dialog creation, dialog state, dialog termination, target refresh"
+    keywords: ["dialog", "early", "confirmed", "tag", "call-id", "b2bua"]
+
+  - number: "13"
+    title: "Initiating a Session"
+    file: "07-initiating-session.md"
+    description: "INVITE method, 3-way handshake, SDP, early media, 200 OK"
+    keywords: ["invite", "sdp", "ringing", "media", "session"]
+
+  - number: "14"
+    title: "Modifying an Existing Session"
+    file: "08-modifying-session.md"
+    description: "re-INVITE for session modification, UPDATE method"
+    keywords: ["re-invite", "update", "hold", "resume"]
+
+  - number: "15"
+    title: "Terminating a Session"
+    file: "09-terminating-session.md"
+    description: "BYE method, session termination flow"
+    keywords: ["bye", "terminate", "hangup"]
+
+  - number: "16"
+    title: "Proxy Behavior"
+    file: "10-proxy-behavior.md"
+    description: "Stateful vs stateless proxies, routing, Record-Route, forwarding"
+    keywords: ["proxy", "stateful", "stateless", "routing"]
+
+  - number: "17"
+    title: "Transactions"
+    file: "11-transactions.md"
+    description: "Client and server transaction state machines, timers, matching"
+    keywords: ["transaction", "state machine", "timer", "invite", "non-invite"]
+
+  - number: "18"
+    title: "Transport"
+    file: "12-transport.md"
+    description: "UDP, TCP, TLS, message framing, Via branch parameter"
+    keywords: ["transport", "udp", "tcp", "tls", "framing"]
+
+  - number: "20"
+    title: "Header Fields"
+    file: "13-headers.md"
+    description: "All header fields, compact forms, usage"
+    keywords: ["headers", "call-id", "cseq", "via", "contact", "compact"]
+
+  - number: "21"
+    title: "Response Codes"
+    file: "14-response-codes.md"
+    description: "All response codes: 1xx, 2xx, 3xx, 4xx, 5xx, 6xx"
+    keywords: ["response", "status", "1xx", "2xx", "3xx", "4xx", "5xx", "6xx"]
+
+  - number: "26"
+    title: "Security Considerations"
+    file: "15-security.md"
+    description: "Attacks, threat models, TLS, Digest auth, S/MIME"
+    keywords: ["security", "tls", "authentication", "sips", "digest"]
+
+  - number: "Appendix A"
+    title: "Table of Timer Values"
+    file: "16-timer-values.md"
+    description: "T1, T2, T4, Timer A-M, default values and descriptions"
+    keywords: ["timer", "t1", "t2", "t4", "timeout", "retransmit"]
+
+# Critical sections for implementation
+critical:
+  - "12"    # Dialogs - core to B2BUA
+  - "17"    # Transactions - state machines
+  - "20"    # Headers - required for all messages
+  - "21"    # Response codes
+  - "7"     # Messages - format basics
+
+# Quick reference lookup
+quick_reference:
+  transaction_states: "11-transactions.md"
+  dialog_creation: "06-dialogs.md"
+  response_codes: "14-response-codes.md"
+  header_fields: "13-headers.md"
+  timers: "16-timer-values.md"
+  transport: "12-transport.md"
+  invite_flow: "07-initiating-session.md"
+  security: "15-security.md"

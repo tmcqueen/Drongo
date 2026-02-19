@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="src\Drongo\Drongo.csproj" />
+  <Project Path="src\Drongo.Core\Drongo.Core.csproj" />
+  <Project Path="src\Drongo.Media\Drongo.Media.csproj" />
+  <Project Path="tests\Drongo.Core.Tests\Drongo.Core.Tests.csproj" />
+  <Project Path="tests\Drongo.Media.Tests\Drongo.Media.Tests.csproj" />
+</Solution>
