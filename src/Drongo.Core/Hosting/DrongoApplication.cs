@@ -34,13 +34,9 @@ public sealed class DrongoApplication : IDrongoApplication
         _registerHandlers = registerHandlers;
         _endpointBuilder = endpointBuilder;
         
-        try
-        {
-            _logger = serviceProvider.GetService<ILogger<DrongoApplication>>();
-            _inviteRouter = serviceProvider.GetService<IInviteRouter>();
-            _registerRouter = serviceProvider.GetService<IRegisterRouter>();
-        }
-        catch { }
+        _logger = serviceProvider.GetService<ILogger<DrongoApplication>>();
+        _inviteRouter = serviceProvider.GetService<IInviteRouter>();
+        _registerRouter = serviceProvider.GetService<IRegisterRouter>();
         
         _appLifetime = new ApplicationLifetime();
     }
