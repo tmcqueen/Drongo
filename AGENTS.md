@@ -28,12 +28,66 @@ _____________________________________
 
 Every task must include unit tests. Each file modified should trigger an update to the relevant unit test, and each session should end with all tests passing.
 
+### Testing Stack
+
+| Component | Technology |
+|----------|------------|
+| Framework | **xUnit v3** with Microsoft.Testing.Platform v2 |
+| Mocking | **NSubstitute** |
+| Assertions | **Shouldly** |
+| Code Coverage | **Microsoft.Testing.Extensions.Coverage** with **coverlet.collector** |
+
+### Test Commands
+
 ```bash
-dotnet test                                   # Run all tests
-dotnet test --collect:"XPlat Code Coverage"   # With coverage
-dotnet test --filter "FullyQualifiedName~Drongo.Core.Tests.DialogTests.CreateDialog_Succeeds"  # Single test
-dotnet test -v n                              # Verbose
+# Run all tests
+dotnet test
+
+# Run tests with code coverage
+dotnet test /p:CollectCoverage=true /p:Threshold=0 /p:CoverletOutputFormat=cobertura /p:CoverletOutput=coverage.cobertura.xml
+
+# Run a single test
+dotnet test --filter "FullyQualifiedName~SipParserTests.ParseRequest_ValidInvite_ReturnsSuccess"
+
+# Run tests in a specific project
 dotnet test tests/Drongo.Core.Tests/Drongo.Core.Tests.csproj
+```
+
+### Testing Guidelines
+
+- Use **xUnit v3** with `[Fact]` attribute
+- Use **NSubstitute** for mocking dependencies
+- Use **Shouldly** for assertions (fluent style)
+- Name tests: `<MethodName>_<Scenario>_<ExpectedResult>`
+- Use Arrange/Act/Assert structure
+- Mock external dependencies (network, timers, time)
+
+```csharp
+using NSubstitute;
+using Shouldly;
+
+[Fact]
+public void ParseRequest_ValidInvite_ReturnsSuccess()
+{
+    // Arrange
+    var parser = new SipParser();
+    var data = "INVITE sip:bob@biloxi.com SIP/2.0\r\n" +
+               "Via: SIP/2.0/UDP pc33.atlanta.com;branch=z9hG4bK776asdhds\r\n" +
+               "To: Bob <sip:bob@biloxi.com>\r\n" +
+               "From: Alice <sip:alice@atlanta.com>;tag=1928301774\r\n" +
+               "Call-ID: test\r\n" +
+               "CSeq: 1 INVITE\r\n" +
+               "Content-Length: 0\r\n" +
+               "\r\n";
+
+    // Act
+    var result = parser.ParseRequest(new ReadOnlySequence<byte>(Encoding.ASCII.GetBytes(data)));
+
+    // Assert
+    result.IsSuccess.ShouldBeTrue();
+    result.Request.ShouldNotBeNull();
+    result.Request!.Method.ShouldBe(SipMethod.Invite);
+}
 ```
 
 ## Linting & Code Quality
@@ -131,8 +185,9 @@ public class SipParseException : Exception
 
 ### Async Patterns
 - Use `Task`-based async throughout
-- Never use `.Result` or `.Wait()` - always `await`
+- **ALWAYS await Tasks** - Never use `.Result` or `.Wait()` - always `await`
 - Use `ValueTask` for hot paths where allocation matters
+- Test methods that return `Task` or `Task<T>` must be marked `async Task` and use `await`, never `.Wait()` or `.Result`
 
 ```csharp
 public async Task<SipResponse> ProcessAsync(SipRequest request, CancellationToken ct)
@@ -140,6 +195,16 @@ public async Task<SipResponse> ProcessAsync(SipRequest request, CancellationToke
     var dialog = await _factory.CreateAsync(request, ct);
     return await dialog.HandleAsync(request, ct);
 }
+```
+
+**Anti-patterns to avoid:**
+```csharp
+// WRONG - blocks thread
+var result = task.Result;
+task.Wait();
+
+// RIGHT - async all the way
+var result = await task;
 ```
 
 ### Logging

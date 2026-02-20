@@ -2,6 +2,7 @@ using System.Buffers;
 using Drongo.Core.Parsing;
 using Drongo.Core.Messages;
 using Xunit;
+using Shouldly;
 
 namespace Drongo.Core.Tests.Parsing;
 
@@ -25,12 +26,12 @@ public class SipParserTests
 
         var result = _parser.ParseRequest(new ReadOnlySequence<byte>(System.Text.Encoding.ASCII.GetBytes(data)));
 
-        Assert.True(result.IsSuccess, result.ErrorMessage);
-        Assert.NotNull(result.Request);
-        Assert.Equal(SipMethod.Invite, result.Request.Method);
-        Assert.Equal("bob", result.Request.RequestUri.User);
-        Assert.Equal("biloxi.com", result.Request.RequestUri.Host);
-        Assert.Equal("a84b4c76e66710@pc33.atlanta.com", result.Request.CallId);
+        result.IsSuccess.ShouldBeTrue(result.ErrorMessage ?? "Parse failed");
+        result.Request.ShouldNotBeNull();
+        result.Request!.Method.ShouldBe(SipMethod.Invite);
+        result.Request.RequestUri.User.ShouldBe("bob");
+        result.Request.RequestUri.Host.ShouldBe("biloxi.com");
+        result.Request.CallId.ShouldBe("a84b4c76e66710@pc33.atlanta.com");
     }
 
     [Fact]
@@ -47,7 +48,7 @@ public class SipParserTests
 
         var result = _parser.ParseRequest(new ReadOnlySequence<byte>(System.Text.Encoding.ASCII.GetBytes(data)));
 
-        Assert.False(result.IsSuccess);
+        result.IsSuccess.ShouldBeFalse();
     }
 
     [Fact]
@@ -65,10 +66,10 @@ public class SipParserTests
 
         var result = _parser.ParseResponse(new ReadOnlySequence<byte>(System.Text.Encoding.ASCII.GetBytes(data)));
 
-        Assert.True(result.IsSuccess, result.ErrorMessage);
-        Assert.NotNull(result.Response);
-        Assert.Equal(200, result.Response.StatusCode);
-        Assert.StartsWith("OK", result.Response.ReasonPhrase);
+        result.IsSuccess.ShouldBeTrue(result.ErrorMessage ?? "Parse failed");
+        result.Response.ShouldNotBeNull();
+        result.Response!.StatusCode.ShouldBe(200);
+        result.Response.ReasonPhrase.ShouldStartWith("OK");
     }
 
     [Fact]
@@ -85,7 +86,7 @@ public class SipParserTests
 
         var result = _parser.ParseResponse(new ReadOnlySequence<byte>(System.Text.Encoding.ASCII.GetBytes(data)));
 
-        Assert.False(result.IsSuccess);
+        result.IsSuccess.ShouldBeFalse();
     }
 
     [Fact]
@@ -107,8 +108,8 @@ public class SipParserTests
 
         var result = _parser.ParseRequest(new ReadOnlySequence<byte>(System.Text.Encoding.ASCII.GetBytes(data)));
 
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Request);
+        result.IsSuccess.ShouldBeTrue();
+        result.Request.ShouldNotBeNull();
     }
 
     [Fact]
@@ -120,6 +121,6 @@ public class SipParserTests
 
         var result = _parser.ParseRequest(new ReadOnlySequence<byte>(System.Text.Encoding.ASCII.GetBytes(data)));
 
-        Assert.True(result.IsSuccess);
+        result.IsSuccess.ShouldBeTrue();
     }
 }

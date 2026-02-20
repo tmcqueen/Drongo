@@ -26,6 +26,14 @@ public sealed record SipUri
 
         var uri = uriString.Trim();
         
+        var angleBracketStart = uri.IndexOf('<');
+        var angleBracketEnd = uri.IndexOf('>');
+        
+        if (angleBracketStart >= 0 && angleBracketEnd > angleBracketStart)
+        {
+            uri = uri[(angleBracketStart + 1)..angleBracketEnd];
+        }
+        
         var schemeEnd = uri.IndexOf(':');
         if (schemeEnd < 0)
             throw new SipParseException($"Invalid URI scheme: {uriString}");
@@ -103,6 +111,33 @@ public sealed record SipUri
     }
 
     public bool IsSecure => Scheme == "sips";
+
+    public System.Net.IPEndPoint? HostEndPoint
+    {
+        get
+        {
+            if (System.Net.IPAddress.TryParse(Host, out var address))
+            {
+                var port = Port > 0 ? Port : 5060;
+                return new System.Net.IPEndPoint(address, port);
+            }
+            return null;
+        }
+    }
+
+    public static bool TryParse(string? uriString, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out SipUri? uri)
+    {
+        try
+        {
+            uri = Parse(uriString ?? string.Empty);
+            return true;
+        }
+        catch
+        {
+            uri = null;
+            return false;
+        }
+    }
 
     public static SipUri CreateAor(string user, string domain) => new("sip", domain, user: user);
 }

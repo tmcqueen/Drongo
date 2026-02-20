@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Drongo.Core.Transport;
 
-public sealed class UdpTransport : IUdpTransport, IDisposable
+public sealed class UdpTransport : IUdpTransport, IAsyncDisposable, IDisposable
 {
     private readonly IUdpTransportFactory _factory;
     private readonly ISipParser _parser;
@@ -16,7 +16,7 @@ public sealed class UdpTransport : IUdpTransport, IDisposable
     private readonly int _port;
     private readonly IPAddress? _address;
     private readonly int _receiveBufferSize;
-    private readonly Channel<(SipRequest? Request, SipResponse? Response, EndPoint RemoteEndpoint)> _messageChannel;
+    private readonly Channel<(SipRequest? Request, SipResponse? Response, EndPoint? RemoteEndpoint)> _messageChannel;
 
     private Socket? _socket;
     private readonly List<SocketAsyncEventArgs> _receiveArgs = new();
@@ -25,6 +25,7 @@ public sealed class UdpTransport : IUdpTransport, IDisposable
     private Task? _receiveLoop;
     private Task? _dispatchLoop;
     private bool _isRunning;
+    private bool _disposed;
 
     public bool IsRunning => _isRunning;
 
@@ -43,7 +44,7 @@ public sealed class UdpTransport : IUdpTransport, IDisposable
         _address = address ?? IPAddress.Any;
         _receiveBufferSize = receiveBufferSize;
         _buffer = new byte[receiveBufferSize];
-        _messageChannel = Channel.CreateBounded<(SipRequest?, SipResponse?, EndPoint)>(100);
+        _messageChannel = Channel.CreateBounded<(SipRequest?, SipResponse?, EndPoint?)>(100);
     }
 
     public async Task StartAsync(CancellationToken ct)
@@ -56,6 +57,8 @@ public sealed class UdpTransport : IUdpTransport, IDisposable
         _socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
         _socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
         
+        ArgumentNullException.ThrowIfNull(_address, nameof(_address));
+
         var endpoint = new IPEndPoint(_address, _port);
         _socket.Bind(endpoint);
 
@@ -195,13 +198,32 @@ public sealed class UdpTransport : IUdpTransport, IDisposable
             await _dispatchLoop;
     }
 
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
-        StopAsync().GetAwaiter().GetResult();
+        if (_disposed)
+            return;
+        
+        _disposed = true;
+        
+        await StopAsync();
         _cts?.Dispose();
         foreach (var args in _receiveArgs)
         {
             args.Dispose();
+        }
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+            return;
+        
+        try
+        {
+            DisposeAsync().GetAwaiter().GetResult();
+        }
+        catch (OperationCanceledException)
+        {
         }
     }
 }
