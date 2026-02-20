@@ -3,7 +3,7 @@ using Drongo.Core.Dialogs;
 using Drongo.Core.Messages;
 using Drongo.Core.Registration;
 
-namespace Drongo.Hosting;
+namespace Drongo.Core.Hosting;
 
 public abstract class DrongoContext
 {
