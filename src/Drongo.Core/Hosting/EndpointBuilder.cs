@@ -35,6 +35,11 @@ public sealed class EndpointBuilder : IEndpointBuilder
     {
         _tlsCertificatePath = certificatePath;
         _tlsCertificatePassword = certificatePassword;
+        _transportType = typeof(System.Net.Sockets.Socket); // TLS implies TCP
+        foreach (var builder in _builders)
+        {
+            builder.WithTransport<System.Net.Sockets.Socket>();
+        }
         return this;
     }
 

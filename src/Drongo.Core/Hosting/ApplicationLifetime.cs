@@ -17,7 +17,7 @@ public sealed class ApplicationLifetime : IApplicationLifetime
         ApplicationStarted = new ApplicationEvent(_startedCallbacks);
     }
 
-    internal async Task NotifyStartingAsync(ApplicationContext context)
+    public async Task NotifyStartingAsync(ApplicationContext context)
     {
         foreach (var callback in _startingCallbacks)
         {
@@ -25,7 +25,7 @@ public sealed class ApplicationLifetime : IApplicationLifetime
         }
     }
 
-    internal async Task NotifyStoppingAsync(ApplicationContext context)
+    public async Task NotifyStoppingAsync(ApplicationContext context)
     {
         foreach (var callback in _stoppingCallbacks)
         {
@@ -33,7 +33,7 @@ public sealed class ApplicationLifetime : IApplicationLifetime
         }
     }
 
-    internal async Task NotifyStartedAsync(ApplicationContext context)
+    public async Task NotifyStartedAsync(ApplicationContext context)
     {
         foreach (var callback in _startedCallbacks)
         {
