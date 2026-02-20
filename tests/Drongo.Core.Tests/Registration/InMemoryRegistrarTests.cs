@@ -28,7 +28,7 @@ public class InMemoryRegistrarTests
         result.IsSuccess.ShouldBeTrue();
         result.StatusCode.ShouldBe(200);
         result.Bindings.ShouldNotBeNull();
-        result.Bindings.Count.ShouldBe(1);
+        result.Bindings!.Count.ShouldBe(1);
         result.Bindings[0].ContactUri.ToString().ShouldContain("alice@192.0.2.1");
     }
 
@@ -42,7 +42,8 @@ public class InMemoryRegistrarTests
         var result = await _registrar.RegisterAsync(request2);
 
         result.IsSuccess.ShouldBeTrue();
-        result.Bindings.Count.ShouldBe(1);
+        result.Bindings.ShouldNotBeNull();
+        result.Bindings!.Count.ShouldBe(1);
     }
 
     [Fact]
@@ -54,7 +55,8 @@ public class InMemoryRegistrarTests
         var result = await _registrar.RegisterAsync(request);
 
         result.IsSuccess.ShouldBeTrue();
-        result.Bindings.Count.ShouldBe(2);
+        result.Bindings.ShouldNotBeNull();
+        result.Bindings!.Count.ShouldBe(2);
     }
 
     [Fact]
@@ -66,7 +68,8 @@ public class InMemoryRegistrarTests
         var unregisterRequest = CreateRegisterRequest("sip:dave@example.com", "<sip:dave@192.0.2.5:5060>;expires=0");
         var result = await _registrar.UnregisterAsync(unregisterRequest);
 
-        result.Bindings.Count.ShouldBe(1);
+        result.Bindings.ShouldNotBeNull();
+        result.Bindings!.Count.ShouldBe(1);
         result.Bindings[0].ContactUri.ToString().ShouldContain("192.0.2.6");
     }
 
@@ -78,7 +81,8 @@ public class InMemoryRegistrarTests
         var unregisterRequest = CreateRegisterRequest("sip:eve@example.com", "*");
         var result = await _registrar.UnregisterAsync(unregisterRequest);
 
-        result.Bindings.Count.ShouldBe(0);
+        result.Bindings.ShouldNotBeNull();
+        result.Bindings!.Count.ShouldBe(0);
         
         var bindings = await _registrar.GetBindingsAsync(SipUri.Parse("sip:eve@example.com"));
         bindings.Count.ShouldBe(0);
@@ -103,7 +107,8 @@ public class InMemoryRegistrarTests
         var request = CreateRegisterRequest("sip:grace@example.com", "<sip:grace@192.0.2.10:5060>");
         var result = await _registrar.RegisterAsync(request);
 
-        result.Bindings[0].ExpiresAt.ShouldBeGreaterThan(DateTimeOffset.UtcNow.AddMinutes(50));
+        result.Bindings.ShouldNotBeNull();
+        result.Bindings![0].ExpiresAt.ShouldBeGreaterThan(DateTimeOffset.UtcNow.AddMinutes(50));
     }
 
     [Fact]
@@ -112,7 +117,8 @@ public class InMemoryRegistrarTests
         var request = CreateRegisterRequest("sip:henry@example.com", "<sip:henry@192.0.2.11:5060>;expires=1800");
         var result = await _registrar.RegisterAsync(request);
 
-        result.Bindings[0].ExpiresAt.ShouldBeGreaterThan(DateTimeOffset.UtcNow.AddMinutes(29));
+        result.Bindings.ShouldNotBeNull();
+        result.Bindings![0].ExpiresAt.ShouldBeGreaterThan(DateTimeOffset.UtcNow.AddMinutes(29));
         result.Bindings[0].ExpiresAt.ShouldBeLessThan(DateTimeOffset.UtcNow.AddMinutes(31));
     }
 
