@@ -20,7 +20,6 @@ public sealed class UdpTransport : IUdpTransport, IAsyncDisposable, IDisposable
 
     private Socket? _socket;
     private readonly List<SocketAsyncEventArgs> _receiveArgs = new();
-    private readonly byte[] _buffer;
     private CancellationTokenSource? _cts;
     private Task? _receiveLoop;
     private Task? _dispatchLoop;
@@ -43,7 +42,6 @@ public sealed class UdpTransport : IUdpTransport, IAsyncDisposable, IDisposable
         _port = port;
         _address = address ?? IPAddress.Any;
         _receiveBufferSize = receiveBufferSize;
-        _buffer = new byte[receiveBufferSize];
         _messageChannel = Channel.CreateBounded<(SipRequest?, SipResponse?, EndPoint?)>(100);
     }
 
@@ -67,12 +65,13 @@ public sealed class UdpTransport : IUdpTransport, IAsyncDisposable, IDisposable
         var receiveCount = Math.Max(1, Environment.ProcessorCount);
         for (int i = 0; i < receiveCount; i++)
         {
+            var buffer = new byte[_receiveBufferSize];
             var args = new SocketAsyncEventArgs();
-            args.SetBuffer(_buffer, 0, _buffer.Length);
+            args.SetBuffer(buffer, 0, buffer.Length);
             args.RemoteEndPoint = new IPEndPoint(IPAddress.Any, 0);
             args.Completed += OnReceiveCompleted;
             _receiveArgs.Add(args);
-            
+
             if (!_socket.ReceiveFromAsync(args))
             {
                 _ = ProcessReceive(args);
@@ -131,8 +130,8 @@ public sealed class UdpTransport : IUdpTransport, IAsyncDisposable, IDisposable
     {
         if (e.SocketError == SocketError.Success && e.BytesTransferred > 0)
         {
-            var data = new ReadOnlySequence<byte>(_buffer, 0, e.BytesTransferred);
-            
+            var data = new ReadOnlySequence<byte>(e.Buffer!, e.Offset, e.BytesTransferred);
+
             if (data.First.Span[0] == 'S' && data.First.Span.Length >= 4)
             {
                 var firstLine = data.First.Span[..4];
@@ -157,7 +156,7 @@ public sealed class UdpTransport : IUdpTransport, IAsyncDisposable, IDisposable
 
         if (_socket != null && _isRunning)
         {
-            e.SetBuffer(0, _buffer.Length);
+            e.SetBuffer(0, e.Buffer!.Length);
             if (!_socket.ReceiveFromAsync(e))
             {
                 return ProcessReceive(e);
