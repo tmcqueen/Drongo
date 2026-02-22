@@ -2,7 +2,7 @@ using System.Text;
 
 namespace Drongo.Core.Messages;
 
-public sealed class SipRequest
+public sealed record SipRequest
 {
     public SipMethod Method { get; init; }
     public SipUri RequestUri { get; init; }
@@ -36,30 +36,61 @@ public sealed class SipRequest
         Body = body;
     }
 
-    public string GetHeader(string name) => Headers.TryGetValue(name, out var value) 
-        ? value 
+    public string GetHeader(string name) => Headers.TryGetValue(name, out var value)
+        ? value
         : throw new InvalidOperationException($"Missing required header: {name}");
 
     public string? TryGetHeader(string name) => Headers.TryGetValue(name, out var value) ? value : null;
 
     public bool HasHeader(string name) => Headers.ContainsKey(name);
 
+    // Records auto-generate equality based on all properties. ReadOnlyMemory<byte> uses
+    // reference/span equality by default, so we override to use byte-sequence equality
+    // for Body and structural equality for Headers.
+    public bool Equals(SipRequest? other)
+    {
+        if (other is null) return false;
+        if (ReferenceEquals(this, other)) return true;
+
+        return Method == other.Method
+            && Equals(RequestUri, other.RequestUri)
+            && SipVersion == other.SipVersion
+            && Headers.Count == other.Headers.Count
+            && !Headers.Except(other.Headers).Any()
+            && Body.Span.SequenceEqual(other.Body.Span);
+    }
+
+    public override int GetHashCode()
+    {
+        var hash = new HashCode();
+        hash.Add(Method);
+        hash.Add(RequestUri);
+        hash.Add(SipVersion);
+        foreach (var (k, v) in Headers.OrderBy(x => x.Key, StringComparer.Ordinal))
+        {
+            hash.Add(k);
+            hash.Add(v);
+        }
+        hash.AddBytes(Body.Span);
+        return hash.ToHashCode();
+    }
+
     public override string ToString()
     {
-        var sb = new System.Text.StringBuilder();
+        var sb = new StringBuilder();
         sb.AppendLine($"{Method.ToMethodString()} {RequestUri} {SipVersion}");
-        
+
         foreach (var (key, value) in Headers)
         {
             sb.AppendLine($"{key}: {value}");
         }
-        
+
         if (HasBody)
         {
             sb.AppendLine();
             sb.Append(Encoding.ASCII.GetString(Body.Span));
         }
-        
+
         return sb.ToString();
     }
 }
