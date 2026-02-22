@@ -91,23 +91,39 @@ public sealed record SipUri
 
     public override string ToString()
     {
-        var result = $"{Scheme}:";
+        // StringBuilder with an estimated capacity avoids repeated string allocations
+        // on every AOR key generation, registration lookup, and log line (Drongo-cpb).
+        var sb = new System.Text.StringBuilder(64);
+        sb.Append(Scheme);
+        sb.Append(':');
 
         if (!string.IsNullOrEmpty(User))
-            result += $"{User}@";
+        {
+            sb.Append(User);
+            sb.Append('@');
+        }
 
-        result += Host;
+        sb.Append(Host);
 
         if (Port > 0)
-            result += $":{Port}";
+        {
+            sb.Append(':');
+            sb.Append(Port);
+        }
 
         if (!string.IsNullOrEmpty(Parameters))
-            result += $";{Parameters}";
+        {
+            sb.Append(';');
+            sb.Append(Parameters);
+        }
 
         if (!string.IsNullOrEmpty(Headers))
-            result += $"?{Headers}";
+        {
+            sb.Append('?');
+            sb.Append(Headers);
+        }
 
-        return result;
+        return sb.ToString();
     }
 
     public bool IsSecure => Scheme == "sips";
@@ -132,8 +148,11 @@ public sealed record SipUri
             uri = Parse(uriString ?? string.Empty);
             return true;
         }
-        catch
+        catch (Exception e) when (e is SipParseException or FormatException or ArgumentException or OverflowException)
         {
+            // Only swallow parse-related exceptions that are expected during URI parsing (Drongo-6bj).
+            // Fatal CLR exceptions (OutOfMemoryException, StackOverflowException, etc.) are NOT caught
+            // and will propagate to the caller as intended.
             uri = null;
             return false;
         }
