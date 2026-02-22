@@ -205,10 +205,58 @@ public class NonInviteClientTransactionTests
     {
         var tx = new NonInviteClientTransaction("test", SipMethod.Bye, _timerFactory, _logger);
         await tx.StartAsync(CreateByeRequest(), _remoteEndPoint);
-        
+
         tx.TransportError();
-        
+
         tx.State.ShouldBe(ClientTransactionState.Terminated);
+    }
+
+    [Fact]
+    public async Task OnTimerEFires_TimerRemovedConcurrentlyDuringCallback_DoesNotThrow()
+    {
+        // Arrange: capture the Timer E callback so we can invoke it manually.
+        // The race: OnTimerEFires passes the state guard (state=Trying), calls Retransmit(),
+        // and concurrently a final response removes Timer E from the dict before reaching
+        // _timers["E"].Change(...). We reproduce this by having the RequestSent event
+        // (fired inside Retransmit) deliver the final response, which stops Timer E,
+        // so the dict no longer has "E" when the buggy line executes.
+        Action? timerECallback = null;
+        var timerF = Substitute.For<ITimer>();
+        var timerE = Substitute.For<ITimer>();
+        var timerK = Substitute.For<ITimer>();
+
+        var callCount = 0;
+        _timerFactory.Create().Returns(_ =>
+        {
+            callCount++;
+            return callCount switch
+            {
+                1 => timerF,  // StartTimerF in StartAsync
+                2 => timerE,  // StartTimerE when 1xx received
+                _ => timerK,  // StartTimerK after final response
+            };
+        });
+
+        timerE.When(t => t.Start(Arg.Any<TimeSpan>(), Arg.Any<Action>()))
+              .Do(ci => timerECallback = ci.Arg<Action>());
+
+        var tx = new NonInviteClientTransaction("test", SipMethod.Bye, _timerFactory, _logger);
+        await tx.StartAsync(CreateByeRequest(), _remoteEndPoint);
+
+        // Move to Proceeding so state guard in OnTimerEFires is passed
+        tx.ReceiveResponse(SipResponse.Create(100, "Trying", new Dictionary<string, string>()));
+        tx.State.ShouldBe(ClientTransactionState.Proceeding);
+        timerECallback.ShouldNotBeNull("Timer E callback was never registered");
+
+        // Wire RequestSent (fired inside Retransmit inside the callback) to deliver
+        // a final response, which removes Timer E from the dict mid-callback.
+        tx.RequestSent += (_, _) =>
+            tx.ReceiveResponse(SipResponse.CreateOk(new Dictionary<string, string>()));
+
+        // Act: fire the callback. In Proceeding state, state guard passes, Retransmit fires,
+        // the RequestSent handler delivers the 200 OK → StopTimer("E") removes from dict,
+        // then the buggy _timers["E"] line executes against an empty entry → KeyNotFoundException.
+        Should.NotThrow(() => timerECallback!());
     }
 }
 

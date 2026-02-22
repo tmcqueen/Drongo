@@ -105,6 +105,11 @@ public abstract class ServerTransaction : IServerTransaction
         }
     }
 
+    protected Drongo.Core.Timers.ITimer? GetTimer(string name)
+    {
+        return _timers.TryGetValue(name, out var timer) ? timer : null;
+    }
+
     protected void LogStateTransition(string eventName)
     {
         _logger.LogTrace(

@@ -146,9 +146,8 @@ public sealed class InviteServerTransaction : ServerTransaction
         if (_timerGInterval > _timerFactory.T2)
             _timerGInterval = _timerFactory.T2;
         
-        var timer = _timers["G"];
-        timer.Change(_timerGInterval);
-        
+        GetTimer(SipTimerNames.TimerG)?.Change(_timerGInterval);
+
         _logger.LogDebug("Timer G interval updated to {Interval}", _timerGInterval);
     }
 
