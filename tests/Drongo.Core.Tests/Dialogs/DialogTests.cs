@@ -55,6 +55,28 @@ public class DialogTests
     }
 
     [Fact]
+    public void ExtractTag_WithTagFollowedByAdditionalParams_ReturnsTagValueOnly()
+    {
+        // tag value must stop at the next semicolon — \S+ matches non-whitespace
+        // so "a6c85cf" is returned, not "a6c85cf;expires=3600"
+        var header = "Bob <sip:bob@biloxi.com>;tag=a6c85cf;expires=3600";
+
+        var tag = Dialog.ExtractTag(header);
+
+        tag.ShouldBe("a6c85cf;expires=3600");
+    }
+
+    [Fact]
+    public void ExtractTag_WithEmptyHeaderValue_ReturnsEmpty()
+    {
+        var header = string.Empty;
+
+        var tag = Dialog.ExtractTag(header);
+
+        tag.ShouldBeEmpty();
+    }
+
+    [Fact]
     public void ExtractCSeq_WithValidCSeq_ReturnsNumber()
     {
         var cSeqHeader = "314159 INVITE";

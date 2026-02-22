@@ -1,5 +1,4 @@
 using System.Net;
-using System.Text.RegularExpressions;
 using Drongo.Core.Messages;
 using Microsoft.Extensions.Logging;
 
