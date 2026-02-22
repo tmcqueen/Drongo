@@ -7,7 +7,7 @@ using System.Text.RegularExpressions;
 
 namespace Drongo.Core.Dialogs;
 
-public sealed class Dialog : IDialog
+public sealed partial class Dialog : IDialog
 {
     private readonly ILogger<Dialog> _logger;
     private readonly List<SipUri> _routeSet = new();
@@ -124,9 +124,12 @@ public sealed class Dialog : IDialog
         _logger.LogDebug("Dialog {CallId} state: Terminated", CallId);
     }
 
+    [GeneratedRegex(@";tag=(\S+)")]
+    private static partial Regex TagRegex();
+
     public static string ExtractTag(string headerValue)
     {
-        var match = Regex.Match(headerValue, ";tag=(\\S+)");
+        var match = TagRegex().Match(headerValue);
         return match.Success ? match.Groups[1].Value : string.Empty;
     }
 
