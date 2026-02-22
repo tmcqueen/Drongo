@@ -192,9 +192,9 @@ public sealed class UdpTransport : IUdpTransport, IAsyncDisposable, IDisposable
         _messageChannel.Writer.Complete();
 
         if (_receiveLoop != null)
-            await _receiveLoop;
+            try { await _receiveLoop; } catch (OperationCanceledException) { }
         if (_dispatchLoop != null)
-            await _dispatchLoop;
+            try { await _dispatchLoop; } catch (OperationCanceledException) { }
     }
 
     public async ValueTask DisposeAsync()
