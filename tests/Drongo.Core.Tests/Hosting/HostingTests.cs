@@ -342,13 +342,14 @@ public class DrongoApplicationTests
         );
 
         startedCalled.ShouldBeTrue();
+        stoppingCalled.ShouldBeTrue();
     }
 
     [Fact]
     public async Task RunAsync_WithCallbacks_CallsOnStartedAfterStartedAndOnStoppingNotBeforeStarted()
     {
-        // Drongo-nwf: onStopping must not fire before the app is started.
-        // Correct order: NotifyStarting -> NotifyStarted -> onStarted -> (app runs) -> onStopping
+        // Drongo-nwf: onStopping must not fire before the app has started.
+        // Correct order: NotifyStarting -> NotifyStarted -> onStarted -> onStopping -> NotifyStoppingAsync
         var builder = new DrongoBuilder();
         var app = builder.Build();
 
@@ -371,22 +372,57 @@ public class DrongoApplicationTests
             ctx => { callOrder.Add("onStopping"); return Task.CompletedTask; }
         );
 
-        // onStopping must appear after NotifyStarted and onStarted, not before
         var notifyStartedIndex = callOrder.IndexOf("NotifyStarted");
         var onStartedIndex = callOrder.IndexOf("onStarted");
         var onStoppingIndex = callOrder.IndexOf("onStopping");
 
+        // All three events must have fired
         notifyStartedIndex.ShouldBeGreaterThanOrEqualTo(0);
         onStartedIndex.ShouldBeGreaterThanOrEqualTo(0);
-        // onStopping may or may not be called in RunAsync — if it is, it must come after onStarted
-        if (onStoppingIndex >= 0)
-        {
-            onStoppingIndex.ShouldBeGreaterThan(onStartedIndex);
-        }
+        onStoppingIndex.ShouldBeGreaterThanOrEqualTo(0);
 
-        // onStopping must NOT fire before NotifyStarted
-        var onStoppingBeforeStarted = onStoppingIndex >= 0 && onStoppingIndex < notifyStartedIndex;
-        onStoppingBeforeStarted.ShouldBeFalse();
+        // onStopping must come after both NotifyStarted and onStarted
+        onStoppingIndex.ShouldBeGreaterThan(notifyStartedIndex);
+        onStoppingIndex.ShouldBeGreaterThan(onStartedIndex);
+    }
+
+    [Fact]
+    public async Task RunAsync_WithStoppingCallback_NotifiesStoppingAfterStarted()
+    {
+        // NotifyStoppingAsync (via ApplicationStopping event) must fire after onStarted.
+        var builder = new DrongoBuilder();
+        var app = builder.Build();
+
+        var callOrder = new List<string>();
+
+        app.AppLifetime.ApplicationStarted.Register(ctx =>
+        {
+            callOrder.Add("NotifyStarted");
+            return Task.CompletedTask;
+        });
+
+        app.AppLifetime.ApplicationStopping.Register(ctx =>
+        {
+            callOrder.Add("NotifyStopping");
+            return Task.CompletedTask;
+        });
+
+        Func<ApplicationContext, Task>? noStopping = null;
+        await app.RunAsync(
+            ctx => { callOrder.Add("onStarted"); return Task.CompletedTask; },
+            noStopping
+        );
+
+        var notifyStartedIndex = callOrder.IndexOf("NotifyStarted");
+        var onStartedIndex = callOrder.IndexOf("onStarted");
+        var notifyStoppingIndex = callOrder.IndexOf("NotifyStopping");
+
+        notifyStartedIndex.ShouldBeGreaterThanOrEqualTo(0);
+        onStartedIndex.ShouldBeGreaterThanOrEqualTo(0);
+        notifyStoppingIndex.ShouldBeGreaterThanOrEqualTo(0);
+
+        // NotifyStopping must come after onStarted
+        notifyStoppingIndex.ShouldBeGreaterThan(onStartedIndex);
     }
 
     [Fact]

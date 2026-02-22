@@ -11,7 +11,7 @@ public interface IDrongoApplication
     IApplicationLifetime AppLifetime { get; }
     
     Task RunAsync();
-    Task RunAsync(Func<ApplicationContext, Task> onStarted, Func<ApplicationContext, Task> onStopping);
+    Task RunAsync(Func<ApplicationContext, Task>? onStarted, Func<ApplicationContext, Task>? onStopping);
     
     IEndpointBuilder MapEndpoint(IPAddress address, int port);
     IReadOnlyList<EndpointInfo> GetEndpoints();
