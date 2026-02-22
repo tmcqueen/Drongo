@@ -44,15 +44,49 @@ public class SipResponseTests
     }
 
     [Fact]
-    public void GetHashCode_TwoInstancesWithSameValues_ProduceSameHash()
+    public void GetHashCode_TwoIndependentInstancesWithSameValues_ProduceSameHash()
     {
-        // Arrange
-        var headers = new Dictionary<string, string>(BaseHeaders);
-        var a = new SipResponse(200, "OK", "SIP/2.0", headers);
-        var b = new SipResponse(200, "OK", "SIP/2.0", headers);
+        // Arrange — two distinct Dictionary<string,string> objects with the same content
+        var headersA = new Dictionary<string, string>(BaseHeaders);
+        var headersB = new Dictionary<string, string>(BaseHeaders);
+        var a = new SipResponse(200, "OK", "SIP/2.0", headersA);
+        var b = new SipResponse(200, "OK", "SIP/2.0", headersB);
+
+        // Act & Assert — consistent with Equals: a == b → a.GetHashCode() == b.GetHashCode()
+        a.Equals(b).ShouldBeTrue();
+        a.GetHashCode().ShouldBe(b.GetHashCode());
+    }
+
+    [Fact]
+    public void Equality_TwoInstancesWithIdenticalBodyContent_AreEqual()
+    {
+        // Arrange — two separate byte arrays with the same content
+        var bodyBytes = System.Text.Encoding.ASCII.GetBytes("application/sdp body content\r\n");
+        var bodyA = new ReadOnlyMemory<byte>(bodyBytes.ToArray());
+        var bodyB = new ReadOnlyMemory<byte>(bodyBytes.ToArray());
+
+        var a = new SipResponse(200, "OK", "SIP/2.0", new Dictionary<string, string>(BaseHeaders), bodyA);
+        var b = new SipResponse(200, "OK", "SIP/2.0", new Dictionary<string, string>(BaseHeaders), bodyB);
 
         // Act & Assert
+        (a == b).ShouldBeTrue();
+        a.Equals(b).ShouldBeTrue();
         a.GetHashCode().ShouldBe(b.GetHashCode());
+    }
+
+    [Fact]
+    public void Equality_TwoInstancesWithDifferentBodyContent_AreNotEqual()
+    {
+        // Arrange
+        var bodyA = new ReadOnlyMemory<byte>(System.Text.Encoding.ASCII.GetBytes("body-one\r\n"));
+        var bodyB = new ReadOnlyMemory<byte>(System.Text.Encoding.ASCII.GetBytes("body-two\r\n"));
+
+        var a = new SipResponse(200, "OK", "SIP/2.0", new Dictionary<string, string>(BaseHeaders), bodyA);
+        var b = new SipResponse(200, "OK", "SIP/2.0", new Dictionary<string, string>(BaseHeaders), bodyB);
+
+        // Act & Assert
+        (a == b).ShouldBeFalse();
+        a.Equals(b).ShouldBeFalse();
     }
 
     // ── with-expression ──────────────────────────────────────────────────────
