@@ -140,10 +140,55 @@ public class InviteServerTransactionTests
     {
         var tx = new InviteServerTransaction("test", _timerFactory, _logger);
         tx.Start(CreateInviteRequest(), _remoteEndPoint);
-        
+
         tx.RetransmitRequest();
-        
+
         tx.State.ShouldBe(ServerTransactionState.Proceeding);
+    }
+
+    [Fact]
+    public async Task OnTimerGFires_TimerRemovedConcurrentlyDuringCallback_DoesNotThrow()
+    {
+        // Arrange: capture the Timer G callback so we can invoke it manually.
+        // The race: OnTimerGFires passes the state guard (state=Completed), calls
+        // OnResponseSent (via ResponseSent event), and concurrently an ACK arrives,
+        // removing Timer G from the dict before reaching _timers["G"].Change(...).
+        // We reproduce this by having the ResponseSent handler deliver the ACK.
+        Action? timerGCallback = null;
+        var timerG = Substitute.For<ITimer>();
+        var timerI = Substitute.For<ITimer>();
+
+        var callCount = 0;
+        _timerFactory.Create().Returns(_ =>
+        {
+            callCount++;
+            return callCount switch
+            {
+                1 => timerG,  // StartTimerG in SendFinalNon2xxResponse
+                _ => timerI,  // StartTimerI when ACK received
+            };
+        });
+
+        timerG.When(t => t.Start(Arg.Any<TimeSpan>(), Arg.Any<Action>()))
+              .Do(ci => timerGCallback = ci.Arg<Action>());
+
+        var tx = new InviteServerTransaction("test", _timerFactory, _logger);
+        tx.Start(CreateInviteRequest(), _remoteEndPoint);
+
+        // Transition to Completed and start Timer G
+        var busyResponse = SipResponse.Create(486, "Busy Here", new Dictionary<string, string>());
+        await tx.SendResponseAsync(busyResponse);
+        tx.State.ShouldBe(ServerTransactionState.Completed);
+        timerGCallback.ShouldNotBeNull("Timer G callback was never registered");
+
+        // Wire ResponseSent (fired inside OnTimerGFires via OnResponseSent) to deliver
+        // an ACK, which stops Timer G (removes from dict) mid-callback.
+        tx.ResponseSent += (_, _) => tx.AckReceived();
+
+        // Act: fire the callback. State=Completed passes the guard, OnResponseSent fires,
+        // the ResponseSent handler delivers ACK → StopTimer("G") removes from dict,
+        // then the buggy _timers["G"] line hits a missing key → KeyNotFoundException.
+        Should.NotThrow(() => timerGCallback!());
     }
 }
 

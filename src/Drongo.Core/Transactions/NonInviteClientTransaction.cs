@@ -139,9 +139,8 @@ public sealed class NonInviteClientTransaction : ClientTransaction
                 _timerEInterval = _timerFactory.T2;
         }
         
-        var timer = _timers["E"];
-        timer.Change(_timerEInterval);
-        
+        GetTimer(SipTimerNames.TimerE)?.Change(_timerEInterval);
+
         _logger.LogDebug("Timer E interval updated to {Interval}", _timerEInterval);
     }
 
