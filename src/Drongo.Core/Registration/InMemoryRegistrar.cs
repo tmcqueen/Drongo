@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Collections.Immutable;
 using Drongo.Core.Messages;
 using Microsoft.Extensions.Logging;
 
@@ -6,7 +7,7 @@ namespace Drongo.Core.Registration;
 
 public sealed class InMemoryRegistrar : IRegistrar
 {
-    private readonly ConcurrentDictionary<string, List<ContactBinding>> _bindings = new();
+    private readonly ConcurrentDictionary<string, ImmutableList<ContactBinding>> _bindings = new();
     private readonly ILogger<InMemoryRegistrar> _logger;
     private const int DefaultExpires = 3600;
     private const int MaxExpires = 7200;
@@ -19,7 +20,6 @@ public sealed class InMemoryRegistrar : IRegistrar
     public Task<RegistrationResult> RegisterAsync(SipRequest request, CancellationToken ct = default)
     {
         var aor = request.To;
-        var callId = request.CallId;
 
         if (string.IsNullOrEmpty(aor))
         {
@@ -29,7 +29,6 @@ public sealed class InMemoryRegistrar : IRegistrar
         var aorUri = SipUri.Parse(aor);
         var aorKey = aorUri.ToString().ToLowerInvariant();
 
-        var expires = GetExpires(request);
         var contacts = ParseContacts(request);
 
         if (contacts.Count == 0)
@@ -37,30 +36,12 @@ public sealed class InMemoryRegistrar : IRegistrar
             return Task.FromResult(new RegistrationResult(false, 400, "Missing Contact header"));
         }
 
-        _bindings.AddOrUpdate(
+        var updated = _bindings.AddOrUpdate(
             aorKey,
-            _ => new List<ContactBinding>(contacts),
-            (_, existing) =>
-            {
-                existing.RemoveAll(c => c.IsExpired);
-                foreach (var contact in contacts)
-                {
-                    var existingIndex = existing.FindIndex(c => 
-                        c.ContactUri.ToString().Equals(contact.ContactUri.ToString(), StringComparison.OrdinalIgnoreCase));
-                    
-                    if (existingIndex >= 0)
-                    {
-                        existing[existingIndex] = contact;
-                    }
-                    else
-                    {
-                        existing.Add(contact);
-                    }
-                }
-                return existing;
-            });
+            _ => ImmutableList.CreateRange(contacts),
+            (_, existing) => MergeContacts(existing, contacts));
 
-        var bindings = _bindings[aorKey]
+        var bindings = updated
             .Where(b => !b.IsExpired)
             .OrderByDescending(b => b.QValue ?? 1.0f)
             .ToList();
@@ -86,23 +67,30 @@ public sealed class InMemoryRegistrar : IRegistrar
         {
             _bindings.TryRemove(aorKey, out _);
             _logger.LogInformation("Unregistered all contacts for AOR {Aor}", aorKey);
-            return Task.FromResult(new RegistrationResult(true, 200, "OK", new List<ContactBinding>()));
+            return Task.FromResult(new RegistrationResult(true, 200, "OK", []));
         }
 
         var contacts = ParseContacts(request);
 
-        if (_bindings.TryGetValue(aorKey, out var existing))
-        {
-            foreach (var contact in contacts)
+        var remaining = _bindings.AddOrUpdate(
+            aorKey,
+            _ => ImmutableList<ContactBinding>.Empty,
+            (_, existing) =>
             {
-                existing.RemoveAll(c => 
-                    c.ContactUri.ToString().Equals(contact.ContactUri.ToString(), StringComparison.OrdinalIgnoreCase));
-            }
-        }
+                var updated = existing;
+                foreach (var contact in contacts)
+                {
+                    updated = updated.RemoveAll(c =>
+                        c.ContactUri.ToString().Equals(
+                            contact.ContactUri.ToString(),
+                            StringComparison.OrdinalIgnoreCase));
+                }
+                return updated;
+            });
 
-        var bindings = _bindings.TryGetValue(aorKey, out var remaining) 
-            ? remaining.Where(b => !b.IsExpired).ToList() 
-            : new List<ContactBinding>();
+        var bindings = remaining
+            .Where(b => !b.IsExpired)
+            .ToList();
 
         return Task.FromResult(new RegistrationResult(true, 200, "OK", bindings));
     }
@@ -110,7 +98,7 @@ public sealed class InMemoryRegistrar : IRegistrar
     public Task<IReadOnlyList<ContactBinding>> GetBindingsAsync(SipUri aor, CancellationToken ct = default)
     {
         var aorKey = aor.ToString().ToLowerInvariant();
-        
+
         if (_bindings.TryGetValue(aorKey, out var bindings))
         {
             var valid = bindings
@@ -130,8 +118,32 @@ public sealed class InMemoryRegistrar : IRegistrar
             .Where(b => !b.IsExpired)
             .OrderByDescending(b => b.QValue ?? 1.0f)
             .ToList();
-        
+
         return Task.FromResult<IReadOnlyList<ContactBinding>>(all);
+    }
+
+    // Pure function — builds a new ImmutableList from existing + incoming contacts.
+    // Called inside AddOrUpdate; must not mutate either argument.
+    private static ImmutableList<ContactBinding> MergeContacts(
+        ImmutableList<ContactBinding> existing,
+        IReadOnlyList<ContactBinding> incoming)
+    {
+        // Start from non-expired existing bindings.
+        var result = existing.RemoveAll(c => c.IsExpired);
+
+        foreach (var contact in incoming)
+        {
+            var idx = result.FindIndex(c =>
+                c.ContactUri.ToString().Equals(
+                    contact.ContactUri.ToString(),
+                    StringComparison.OrdinalIgnoreCase));
+
+            result = idx >= 0
+                ? result.SetItem(idx, contact)   // refresh / update existing
+                : result.Add(contact);            // new binding
+        }
+
+        return result;
     }
 
     private int GetExpires(SipRequest request)
