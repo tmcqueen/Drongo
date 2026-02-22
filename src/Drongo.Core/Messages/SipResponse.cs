@@ -2,7 +2,7 @@ using System.Text;
 
 namespace Drongo.Core.Messages;
 
-public sealed class SipResponse
+public sealed record SipResponse
 {
     public int StatusCode { get; init; }
     public string ReasonPhrase { get; init; }
@@ -41,13 +41,44 @@ public sealed class SipResponse
         Body = body;
     }
 
-    public string GetHeader(string name) => Headers.TryGetValue(name, out var value) 
-        ? value 
+    public string GetHeader(string name) => Headers.TryGetValue(name, out var value)
+        ? value
         : throw new InvalidOperationException($"Missing required header: {name}");
 
     public string? TryGetHeader(string name) => Headers.TryGetValue(name, out var value) ? value : null;
 
     public bool HasHeader(string name) => Headers.ContainsKey(name);
+
+    // Records auto-generate equality based on all properties. ReadOnlyMemory<byte> uses
+    // reference/span equality by default, so we override to use byte-sequence equality
+    // for Body and structural equality for Headers.
+    public bool Equals(SipResponse? other)
+    {
+        if (other is null) return false;
+        if (ReferenceEquals(this, other)) return true;
+
+        return StatusCode == other.StatusCode
+            && ReasonPhrase == other.ReasonPhrase
+            && SipVersion == other.SipVersion
+            && Headers.Count == other.Headers.Count
+            && !Headers.Except(other.Headers).Any()
+            && Body.Span.SequenceEqual(other.Body.Span);
+    }
+
+    public override int GetHashCode()
+    {
+        var hash = new HashCode();
+        hash.Add(StatusCode);
+        hash.Add(ReasonPhrase);
+        hash.Add(SipVersion);
+        foreach (var (k, v) in Headers.OrderBy(x => x.Key, StringComparer.Ordinal))
+        {
+            hash.Add(k);
+            hash.Add(v);
+        }
+        hash.AddBytes(Body.Span);
+        return hash.ToHashCode();
+    }
 
     public static SipResponse Create(
         int statusCode,
@@ -82,20 +113,20 @@ public sealed class SipResponse
 
     public override string ToString()
     {
-        var sb = new System.Text.StringBuilder();
+        var sb = new StringBuilder();
         sb.AppendLine($"{SipVersion} {StatusCode} {ReasonPhrase}");
-        
+
         foreach (var (key, value) in Headers)
         {
             sb.AppendLine($"{key}: {value}");
         }
-        
+
         if (HasBody)
         {
             sb.AppendLine();
             sb.Append(Encoding.ASCII.GetString(Body.Span));
         }
-        
+
         return sb.ToString();
     }
 }
