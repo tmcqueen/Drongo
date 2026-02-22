@@ -55,10 +55,10 @@ public class DialogTests
     }
 
     [Fact]
-    public void ExtractTag_WithTagFollowedByAdditionalParams_ReturnsTagValueOnly()
+    public void ExtractTag_WithTagFollowedByAdditionalParams_ReturnsAllNonWhitespaceAfterTag()
     {
-        // tag value must stop at the next semicolon — \S+ matches non-whitespace
-        // so "a6c85cf" is returned, not "a6c85cf;expires=3600"
+        // \S+ is greedy: it captures all non-whitespace characters after "tag=",
+        // including any trailing semicolon-separated parameters.
         var header = "Bob <sip:bob@biloxi.com>;tag=a6c85cf;expires=3600";
 
         var tag = Dialog.ExtractTag(header);
