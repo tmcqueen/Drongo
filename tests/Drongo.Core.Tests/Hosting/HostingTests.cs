@@ -343,4 +343,64 @@ public class DrongoApplicationTests
 
         startedCalled.ShouldBeTrue();
     }
+
+    [Fact]
+    public async Task RunAsync_WithCallbacks_CallsOnStartedAfterStartedAndOnStoppingNotBeforeStarted()
+    {
+        // Drongo-nwf: onStopping must not fire before the app is started.
+        // Correct order: NotifyStarting -> NotifyStarted -> onStarted -> (app runs) -> onStopping
+        var builder = new DrongoBuilder();
+        var app = builder.Build();
+
+        var callOrder = new List<string>();
+
+        app.AppLifetime.ApplicationStarting.Register(ctx =>
+        {
+            callOrder.Add("NotifyStarting");
+            return Task.CompletedTask;
+        });
+
+        app.AppLifetime.ApplicationStarted.Register(ctx =>
+        {
+            callOrder.Add("NotifyStarted");
+            return Task.CompletedTask;
+        });
+
+        await app.RunAsync(
+            ctx => { callOrder.Add("onStarted"); return Task.CompletedTask; },
+            ctx => { callOrder.Add("onStopping"); return Task.CompletedTask; }
+        );
+
+        // onStopping must appear after NotifyStarted and onStarted, not before
+        var notifyStartedIndex = callOrder.IndexOf("NotifyStarted");
+        var onStartedIndex = callOrder.IndexOf("onStarted");
+        var onStoppingIndex = callOrder.IndexOf("onStopping");
+
+        notifyStartedIndex.ShouldBeGreaterThanOrEqualTo(0);
+        onStartedIndex.ShouldBeGreaterThanOrEqualTo(0);
+        // onStopping may or may not be called in RunAsync — if it is, it must come after onStarted
+        if (onStoppingIndex >= 0)
+        {
+            onStoppingIndex.ShouldBeGreaterThan(onStartedIndex);
+        }
+
+        // onStopping must NOT fire before NotifyStarted
+        var onStoppingBeforeStarted = onStoppingIndex >= 0 && onStoppingIndex < notifyStartedIndex;
+        onStoppingBeforeStarted.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Services_AfterBuild_ReturnsNonNullServiceCollection()
+    {
+        // Drongo-ao0: Services property must not throw; IServiceCollection must be resolvable.
+        var builder = new DrongoBuilder();
+        var app = builder.Build() as DrongoApplication;
+
+        app.ShouldNotBeNull();
+        Should.NotThrow(() =>
+        {
+            var services = app!.Services;
+            services.ShouldNotBeNull();
+        });
+    }
 }

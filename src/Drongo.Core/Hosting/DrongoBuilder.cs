@@ -22,6 +22,7 @@ public sealed class DrongoBuilder : IDrongoApplicationBuilder
         Services.AddSingleton<IInviteRouter>(sp => new InviteRouter(sp.GetRequiredService<List<Func<InviteContext, Task>>>()));
         Services.AddSingleton<IRegisterRouter>(sp => new RegisterRouter(sp.GetRequiredService<List<Func<RegisterContext, Task>>>()));
         Services.AddSingleton<IApplicationLifetime, ApplicationLifetime>();
+        Services.AddSingleton<IServiceCollection>(Services);
 
         return new DrongoApplication(
             Services.BuildServiceProvider(),

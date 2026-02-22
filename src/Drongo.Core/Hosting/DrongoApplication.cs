@@ -52,18 +52,19 @@ public sealed class DrongoApplication : IDrongoApplication
         };
 
         await _appLifetime.NotifyStartingAsync(context);
-
-        if (onStopping != null)
-        {
-            await onStopping(context);
-        }
-
         await _appLifetime.NotifyStartedAsync(context);
 
         if (onStarted != null)
         {
             await onStarted(context);
         }
+
+        if (onStopping != null)
+        {
+            await onStopping(context);
+        }
+
+        await _appLifetime.NotifyStoppingAsync(context);
     }
 
     public IEndpointBuilder MapEndpoint(IPAddress address, int port)
