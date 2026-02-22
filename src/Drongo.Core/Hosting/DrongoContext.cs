@@ -57,10 +57,7 @@ public sealed class RegisterContext : DrongoContext
 
         if (Bindings != null)
         {
-            foreach (var binding in Bindings)
-            {
-                headers.TryAdd("Contact", binding.ToString());
-            }
+            headers["Contact"] = string.Join(", ", Bindings.Select(b => b.ToString()));
             headers["Expires"] = "3600";
         }
 
