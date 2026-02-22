@@ -6,6 +6,194 @@ using Shouldly;
 
 namespace Drongo.Core.Tests.Parsing;
 
+public class SipRequestParseResultTests
+{
+    [Fact]
+    public void Success_WithRequest_SetsIsSuccessTrue()
+    {
+        var request = new SipRequest(SipMethod.Invite, SipUri.Parse("sip:bob@biloxi.com"), "SIP/2.0",
+            new Dictionary<string, string>(), default);
+
+        var result = SipRequestParseResult.Success(request);
+
+        result.IsSuccess.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Success_WithRequest_SetsRequestProperty()
+    {
+        var request = new SipRequest(SipMethod.Invite, SipUri.Parse("sip:bob@biloxi.com"), "SIP/2.0",
+            new Dictionary<string, string>(), default);
+
+        var result = SipRequestParseResult.Success(request);
+
+        result.Request.ShouldBeSameAs(request);
+    }
+
+    [Fact]
+    public void Success_WithRequest_ErrorMessageIsNull()
+    {
+        var request = new SipRequest(SipMethod.Invite, SipUri.Parse("sip:bob@biloxi.com"), "SIP/2.0",
+            new Dictionary<string, string>(), default);
+
+        var result = SipRequestParseResult.Success(request);
+
+        result.ErrorMessage.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Success_WithRequest_ErrorPositionIsNull()
+    {
+        var request = new SipRequest(SipMethod.Invite, SipUri.Parse("sip:bob@biloxi.com"), "SIP/2.0",
+            new Dictionary<string, string>(), default);
+
+        var result = SipRequestParseResult.Success(request);
+
+        result.ErrorPosition.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Failure_WithMessage_SetsIsSuccessFalse()
+    {
+        var result = SipRequestParseResult.Failure("parse failed");
+
+        result.IsSuccess.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Failure_WithMessage_SetsErrorMessage()
+    {
+        var result = SipRequestParseResult.Failure("parse failed");
+
+        result.ErrorMessage.ShouldBe("parse failed");
+    }
+
+    [Fact]
+    public void Failure_WithMessage_RequestIsNull()
+    {
+        var result = SipRequestParseResult.Failure("parse failed");
+
+        result.Request.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Failure_WithMessageAndPosition_SetsErrorPosition()
+    {
+        var result = SipRequestParseResult.Failure("parse failed", 42);
+
+        result.ErrorPosition.ShouldBe(42);
+    }
+
+    [Fact]
+    public void Failure_WithMessageOnly_ErrorPositionIsNull()
+    {
+        var result = SipRequestParseResult.Failure("parse failed");
+
+        result.ErrorPosition.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Type_IsNotDerivedFromAbstractSipParseResult()
+    {
+        // SipRequestParseResult must be a self-contained sealed type, not inheriting from SipParseResult
+        typeof(SipRequestParseResult).BaseType.ShouldBe(typeof(object));
+    }
+}
+
+public class SipResponseParseResultTests
+{
+    [Fact]
+    public void Success_WithResponse_SetsIsSuccessTrue()
+    {
+        var response = new SipResponse(200, "OK", "SIP/2.0",
+            new Dictionary<string, string>(), default);
+
+        var result = SipResponseParseResult.Success(response);
+
+        result.IsSuccess.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Success_WithResponse_SetsResponseProperty()
+    {
+        var response = new SipResponse(200, "OK", "SIP/2.0",
+            new Dictionary<string, string>(), default);
+
+        var result = SipResponseParseResult.Success(response);
+
+        result.Response.ShouldBeSameAs(response);
+    }
+
+    [Fact]
+    public void Success_WithResponse_ErrorMessageIsNull()
+    {
+        var response = new SipResponse(200, "OK", "SIP/2.0",
+            new Dictionary<string, string>(), default);
+
+        var result = SipResponseParseResult.Success(response);
+
+        result.ErrorMessage.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Success_WithResponse_ErrorPositionIsNull()
+    {
+        var response = new SipResponse(200, "OK", "SIP/2.0",
+            new Dictionary<string, string>(), default);
+
+        var result = SipResponseParseResult.Success(response);
+
+        result.ErrorPosition.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Failure_WithMessage_SetsIsSuccessFalse()
+    {
+        var result = SipResponseParseResult.Failure("parse failed");
+
+        result.IsSuccess.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Failure_WithMessage_SetsErrorMessage()
+    {
+        var result = SipResponseParseResult.Failure("parse failed");
+
+        result.ErrorMessage.ShouldBe("parse failed");
+    }
+
+    [Fact]
+    public void Failure_WithMessage_ResponseIsNull()
+    {
+        var result = SipResponseParseResult.Failure("parse failed");
+
+        result.Response.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Failure_WithMessageAndPosition_SetsErrorPosition()
+    {
+        var result = SipResponseParseResult.Failure("parse failed", 42);
+
+        result.ErrorPosition.ShouldBe(42);
+    }
+
+    [Fact]
+    public void Failure_WithMessageOnly_ErrorPositionIsNull()
+    {
+        var result = SipResponseParseResult.Failure("parse failed");
+
+        result.ErrorPosition.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Type_IsNotDerivedFromAbstractSipParseResult()
+    {
+        // SipResponseParseResult must be a self-contained sealed type, not inheriting from SipParseResult
+        typeof(SipResponseParseResult).BaseType.ShouldBe(typeof(object));
+    }
+}
+
 public class SipParserTests
 {
     private readonly SipParser _parser = new();

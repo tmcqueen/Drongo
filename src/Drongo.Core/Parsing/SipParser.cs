@@ -9,77 +9,48 @@ public interface ISipParser
     SipResponseParseResult ParseResponse(ReadOnlySequence<byte> data);
 }
 
-public abstract class SipParseResult
+public sealed class SipRequestParseResult
 {
-    public bool IsSuccess { get; protected set; }
-    public string? ErrorMessage { get; protected set; }
-    public int? ErrorPosition { get; protected set; }
+    public bool IsSuccess { get; }
+    public Messages.SipRequest? Request { get; }
+    public string? ErrorMessage { get; }
+    public int? ErrorPosition { get; }
 
-    public static SipParseResult Success() => new SuccessResult();
-    public static SipParseResult Failure(string message, int? position = null) => new FailureResult(message, position);
-
-    private sealed class SuccessResult : SipParseResult
+    private SipRequestParseResult(bool isSuccess, Messages.SipRequest? request, string? errorMessage, int? errorPosition)
     {
-        public SuccessResult() => IsSuccess = true;
+        IsSuccess = isSuccess;
+        Request = request;
+        ErrorMessage = errorMessage;
+        ErrorPosition = errorPosition;
     }
 
-    private sealed class FailureResult : SipParseResult
-    {
-        public FailureResult(string message, int? position)
-        {
-            IsSuccess = false;
-            ErrorMessage = message;
-            ErrorPosition = position;
-        }
-    }
+    public static SipRequestParseResult Success(Messages.SipRequest request) =>
+        new(true, request, null, null);
+
+    public static SipRequestParseResult Failure(string message, int? position = null) =>
+        new(false, null, message, position);
 }
 
-public sealed class SipRequestParseResult : SipParseResult
+public sealed class SipResponseParseResult
 {
-    public Messages.SipRequest? Request { get; private set; }
+    public bool IsSuccess { get; }
+    public Messages.SipResponse? Response { get; }
+    public string? ErrorMessage { get; }
+    public int? ErrorPosition { get; }
 
-    public static SipRequestParseResult Success(Messages.SipRequest request)
+    private SipResponseParseResult(bool isSuccess, Messages.SipResponse? response, string? errorMessage, int? errorPosition)
     {
-        return new SipRequestParseResult
-        {
-            IsSuccess = true,
-            Request = request
-        };
+        IsSuccess = isSuccess;
+        Response = response;
+        ErrorMessage = errorMessage;
+        ErrorPosition = errorPosition;
     }
 
-    public new static SipRequestParseResult Failure(string message, int? position = null)
-    {
-        return new SipRequestParseResult
-        {
-            IsSuccess = false,
-            ErrorMessage = message,
-            ErrorPosition = position
-        };
-    }
-}
+    public static SipResponseParseResult Success(Messages.SipResponse response) =>
+        new(true, response, null, null);
 
-public sealed class SipResponseParseResult : SipParseResult
-{
-    public Messages.SipResponse? Response { get; private set; }
-
-    public static SipResponseParseResult Success(Messages.SipResponse response)
-    {
-        return new SipResponseParseResult
-        {
-            IsSuccess = true,
-            Response = response
-        };
-    }
-
-    public new static SipResponseParseResult Failure(string message, int? position = null)
-    {
-        return new SipResponseParseResult
-        {
-            IsSuccess = false,
-            ErrorMessage = message,
-            ErrorPosition = position
-        };
-    }
+    public static SipResponseParseResult Failure(string message, int? position = null) =>
+        new(false, null, message, position);
 }
 
 public sealed class SipParser : ISipParser
@@ -89,13 +60,13 @@ public sealed class SipParser : ISipParser
         try
         {
             var reader = new SequenceReader<byte>(data);
-            
+
             if (!TryReadLine(ref reader, out var requestLine))
                 return SipRequestParseResult.Failure("Empty request");
 
             var requestLineStr = Encoding.ASCII.GetString(requestLine);
             var requestParts = requestLineStr.Split(' ', 3);
-            
+
             if (requestParts.Length != 3)
                 return SipRequestParseResult.Failure($"Invalid request line: {requestLineStr}");
 
@@ -146,13 +117,13 @@ public sealed class SipParser : ISipParser
         try
         {
             var reader = new SequenceReader<byte>(data);
-            
+
             if (!TryReadLine(ref reader, out var statusLine))
                 return SipResponseParseResult.Failure("Empty response");
 
             var statusLineStr = Encoding.ASCII.GetString(statusLine);
             var statusParts = statusLineStr.Split(' ', 3);
-            
+
             if (statusParts.Length < 2)
                 return SipResponseParseResult.Failure($"Invalid status line: {statusLineStr}");
 
