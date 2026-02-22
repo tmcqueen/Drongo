@@ -148,7 +148,7 @@ public sealed record SipUri
             uri = Parse(uriString ?? string.Empty);
             return true;
         }
-        catch (Exception ex) when (ex is SipParseException or FormatException or ArgumentException or OverflowException)
+        catch (Exception e) when (e is SipParseException or FormatException or ArgumentException or OverflowException)
         {
             // Only swallow parse-related exceptions that are expected during URI parsing (Drongo-6bj).
             // Fatal CLR exceptions (OutOfMemoryException, StackOverflowException, etc.) are NOT caught
