@@ -1,6 +1,9 @@
 using System.Net;
 using System.Net.Sockets;
 using Drongo.Core.Hosting;
+using Drongo.Core.Messages;
+using Drongo.Core.Registration;
+using NSubstitute;
 using Xunit;
 using Shouldly;
 
@@ -342,5 +345,130 @@ public class DrongoApplicationTests
         );
 
         startedCalled.ShouldBeTrue();
+    }
+}
+
+public class RegisterContextTests
+{
+    private static SipRequest MakeRegisterRequest() =>
+        new SipRequest(
+            SipMethod.Register,
+            SipUri.Parse("sip:example.com"),
+            "SIP/2.0",
+            new Dictionary<string, string>
+            {
+                ["Via"] = "SIP/2.0/UDP 192.168.1.1:5060;branch=z9hG4bK776asdhds",
+                ["From"] = "<sip:alice@example.com>;tag=1928301774",
+                ["To"] = "<sip:alice@example.com>",
+                ["Call-ID"] = "a84b4c76e66710@192.168.1.1",
+                ["CSeq"] = "314159 REGISTER",
+                ["Contact"] = "<sip:alice@192.168.1.1>"
+            });
+
+    private static ContactBinding MakeBinding(string user, string host) =>
+        new ContactBinding(
+            new SipUri("sip", host, user: user),
+            DateTimeOffset.MaxValue);
+
+    [Fact]
+    public async Task SendResponseAsync_SingleBinding_SetsContactHeader()
+    {
+        var router = Substitute.For<IRegisterRouter>();
+        var registrar = Substitute.For<IRegistrar>();
+        var context = new RegisterContext
+        {
+            Request = MakeRegisterRequest(),
+            RemoteEndpoint = new IPEndPoint(IPAddress.Loopback, 5060),
+            Router = router,
+            Registrar = registrar,
+            Bindings = new List<ContactBinding> { MakeBinding("alice", "192.168.1.1") }
+        };
+
+        await context.SendResponseAsync(200, "OK");
+
+        context.Response.ShouldNotBeNull();
+        context.Response!.Contact.ShouldNotBeNull();
+        context.Response.Contact!.ShouldContain("alice@192.168.1.1");
+    }
+
+    [Fact]
+    public async Task SendResponseAsync_MultipleBindings_AllBindingsIncludedInContactHeader()
+    {
+        var router = Substitute.For<IRegisterRouter>();
+        var registrar = Substitute.For<IRegistrar>();
+        var bindings = new List<ContactBinding>
+        {
+            MakeBinding("alice", "192.168.1.1"),
+            MakeBinding("alice", "10.0.0.1"),
+            MakeBinding("alice", "172.16.0.1")
+        };
+        var context = new RegisterContext
+        {
+            Request = MakeRegisterRequest(),
+            RemoteEndpoint = new IPEndPoint(IPAddress.Loopback, 5060),
+            Router = router,
+            Registrar = registrar,
+            Bindings = bindings
+        };
+
+        await context.SendResponseAsync(200, "OK");
+
+        context.Response.ShouldNotBeNull();
+        var contactHeader = context.Response!.Contact;
+        contactHeader.ShouldNotBeNull();
+        contactHeader!.ShouldContain("alice@192.168.1.1");
+        contactHeader.ShouldContain("alice@10.0.0.1");
+        contactHeader.ShouldContain("alice@172.16.0.1");
+    }
+
+    [Fact]
+    public async Task SendResponseAsync_MultipleBindings_ContactHeaderIsCommaSeparated()
+    {
+        var router = Substitute.For<IRegisterRouter>();
+        var registrar = Substitute.For<IRegistrar>();
+        var bindings = new List<ContactBinding>
+        {
+            MakeBinding("alice", "192.168.1.1"),
+            MakeBinding("alice", "10.0.0.1")
+        };
+        var context = new RegisterContext
+        {
+            Request = MakeRegisterRequest(),
+            RemoteEndpoint = new IPEndPoint(IPAddress.Loopback, 5060),
+            Router = router,
+            Registrar = registrar,
+            Bindings = bindings
+        };
+
+        await context.SendResponseAsync(200, "OK");
+
+        context.Response.ShouldNotBeNull();
+        var contactHeader = context.Response!.Contact;
+        contactHeader.ShouldNotBeNull();
+        // RFC 3261: multiple Contact values are comma-separated in one header
+        var parts = contactHeader!.Split(',');
+        parts.Length.ShouldBe(2);
+        parts[0].Trim().ShouldContain("alice@192.168.1.1");
+        parts[1].Trim().ShouldContain("alice@10.0.0.1");
+    }
+
+    [Fact]
+    public async Task SendResponseAsync_NullBindings_OmitsContactHeader()
+    {
+        var router = Substitute.For<IRegisterRouter>();
+        var registrar = Substitute.For<IRegistrar>();
+        var context = new RegisterContext
+        {
+            Request = MakeRegisterRequest(),
+            RemoteEndpoint = new IPEndPoint(IPAddress.Loopback, 5060),
+            Router = router,
+            Registrar = registrar,
+            Bindings = null
+        };
+
+        await context.SendResponseAsync(200, "OK");
+
+        context.Response.ShouldNotBeNull();
+        context.Response!.Contact.ShouldBeNull();
     }
 }
