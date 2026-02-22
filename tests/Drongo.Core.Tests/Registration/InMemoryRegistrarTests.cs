@@ -4,6 +4,10 @@ using Microsoft.Extensions.Logging;
 using NSubstitute;
 using Shouldly;
 using Xunit;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Drongo.Core.Tests.Registration;
 
@@ -120,6 +124,156 @@ public class InMemoryRegistrarTests
         result.Bindings.ShouldNotBeNull();
         result.Bindings![0].ExpiresAt.ShouldBeGreaterThan(DateTimeOffset.UtcNow.AddMinutes(29));
         result.Bindings[0].ExpiresAt.ShouldBeLessThan(DateTimeOffset.UtcNow.AddMinutes(31));
+    }
+
+    [Fact]
+    public async Task RegisterAsync_ConcurrentDistinctContactsForSameAor_NoBindingsAreLost()
+    {
+        // Arrange: 20 distinct contacts will be registered in parallel for the same AOR.
+        // A race condition on the shared List<ContactBinding> can cause some adds to be
+        // silently dropped, so we assert that all 20 survive.
+        const int threadCount = 20;
+        var aor = "sip:concurrent@example.com";
+        var tasks = Enumerable.Range(1, threadCount)
+            .Select(i => _registrar.RegisterAsync(
+                CreateRegisterRequest(aor, $"<sip:concurrent@10.0.0.{i}:5060>")))
+            .ToList();
+
+        // Act
+        await Task.WhenAll(tasks);
+
+        // Assert
+        var bindings = await _registrar.GetBindingsAsync(SipUri.Parse(aor));
+        bindings.Count.ShouldBe(threadCount,
+            $"Expected {threadCount} distinct bindings but got {bindings.Count}. " +
+            "A count < threadCount indicates a lost update due to a race condition.");
+    }
+
+    [Fact]
+    public async Task RegisterAsync_ConcurrentRefreshOfSameContact_BindingCountRemainsOne()
+    {
+        // Arrange: the same contact URI is re-registered (refreshed) from many threads at once.
+        // The idempotent refresh must produce exactly 1 binding regardless of concurrency.
+        const int threadCount = 30;
+        var aor = "sip:refresh@example.com";
+        var contact = "<sip:refresh@10.0.1.1:5060>";
+
+        var tasks = Enumerable.Range(0, threadCount)
+            .Select(_ => _registrar.RegisterAsync(CreateRegisterRequest(aor, contact)))
+            .ToList();
+
+        // Act
+        await Task.WhenAll(tasks);
+
+        // Assert
+        var bindings = await _registrar.GetBindingsAsync(SipUri.Parse(aor));
+        bindings.Count.ShouldBe(1,
+            "Concurrent refresh of the same contact URI must remain idempotent and yield exactly 1 binding.");
+    }
+
+    [Fact]
+    public async Task RegisterAsync_ConcurrentRegistersAndReads_ReadsNeverThrow()
+    {
+        // Arrange: simultaneously hammer register and GetBindings to catch
+        // InvalidOperationException / index-out-of-range from unsynchronised List mutation.
+        const int writerCount = 15;
+        const int readerCount = 15;
+        var aor = "sip:chaos@example.com";
+        var sipAor = SipUri.Parse(aor);
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+        var writers = Enumerable.Range(1, writerCount)
+            .Select(i => _registrar.RegisterAsync(
+                CreateRegisterRequest(aor, $"<sip:chaos@10.0.2.{i}:5060>"), cts.Token))
+            .ToList();
+
+        var readers = Enumerable.Range(0, readerCount)
+            .Select(_ => _registrar.GetBindingsAsync(sipAor, cts.Token))
+            .ToList();
+
+        // Act + Assert: no exception must escape any task
+        var allTasks = writers.Cast<Task>().Concat(readers.Cast<Task>()).ToList();
+        var exception = await Record.ExceptionAsync(() => Task.WhenAll(allTasks));
+        exception.ShouldBeNull("Concurrent register+read must never throw.");
+    }
+
+    [Fact]
+    public async Task UnregisterAsync_ConcurrentUnregisterAndRegister_NoCorruption()
+    {
+        // Arrange: seed two contacts, then concurrently unregister one while registering a third.
+        var aor = "sip:unregrace@example.com";
+        await _registrar.RegisterAsync(CreateRegisterRequest(aor, "<sip:unregrace@10.0.3.1:5060>"));
+        await _registrar.RegisterAsync(CreateRegisterRequest(aor, "<sip:unregrace@10.0.3.2:5060>"));
+
+        var unregisterTask = _registrar.UnregisterAsync(
+            CreateRegisterRequest(aor, "<sip:unregrace@10.0.3.1:5060>;expires=0"));
+        var registerTask = _registrar.RegisterAsync(
+            CreateRegisterRequest(aor, "<sip:unregrace@10.0.3.3:5060>"));
+
+        // Act
+        await Task.WhenAll(unregisterTask, registerTask);
+
+        // Assert: .10.0.3.1 should be gone, .2 and .3 should exist (or at least no corruption/exception).
+        var bindings = await _registrar.GetBindingsAsync(SipUri.Parse(aor));
+        bindings.ShouldNotBeNull();
+        bindings.Any(b => b.ContactUri.ToString().Contains("10.0.3.1")).ShouldBeFalse(
+            "The unregistered contact 10.0.3.1 must not appear in final bindings.");
+    }
+
+    [Fact]
+    public async Task GetAllBindingsAsync_ConcurrentRegistrations_ReturnsConsistentSnapshot()
+    {
+        // Arrange: register contacts for multiple AORs concurrently, then read all.
+        const int aorCount = 10;
+        var tasks = Enumerable.Range(1, aorCount)
+            .Select(i => _registrar.RegisterAsync(
+                CreateRegisterRequest($"sip:user{i}@example.com", $"<sip:user{i}@10.0.4.{i}:5060>")))
+            .ToList();
+
+        await Task.WhenAll(tasks);
+
+        // Act: calling GetAllBindingsAsync must not throw and must return a stable count.
+        var exception = await Record.ExceptionAsync(() => _registrar.GetAllBindingsAsync());
+        exception.ShouldBeNull("GetAllBindingsAsync must not throw under concurrent writes.");
+
+        var allBindings = await _registrar.GetAllBindingsAsync();
+        allBindings.Count.ShouldBe(aorCount,
+            $"Expected exactly {aorCount} bindings (one per AOR) but got {allBindings.Count}.");
+    }
+
+    [Fact]
+    public async Task UnregisterAsync_UnknownAor_DoesNotCreatePhantomEntry()
+    {
+        // Arrange: one real AOR registered, then several never-registered AORs are
+        // unregistered.  The buggy AddOrUpdate add-factory inserts an empty
+        // ImmutableList for each unknown AOR, causing the dictionary to grow
+        // unboundedly.  We verify via InMemoryRegistrar.AorCount (internal) which
+        // directly exposes _bindings.Count without going through the public API's
+        // SelectMany filter that hides empty-list entries.
+        const int phantomCount = 5;
+        var realAor = "sip:real@example.com";
+        await _registrar.RegisterAsync(CreateRegisterRequest(realAor, "<sip:real@10.0.5.100:5060>"));
+
+        // Act: unregister multiple never-registered AORs.
+        for (var i = 1; i <= phantomCount; i++)
+        {
+            var phantomAor = $"sip:phantom{i}@example.com";
+            var result = await _registrar.UnregisterAsync(
+                CreateRegisterRequest(phantomAor, $"<sip:phantom{i}@10.0.5.{i}:5060>;expires=0"));
+
+            // Each call must succeed with an empty binding list.
+            result.IsSuccess.ShouldBeTrue();
+            result.Bindings.ShouldNotBeNull();
+            result.Bindings!.Count.ShouldBe(0,
+                $"UnregisterAsync on unknown AOR sip:phantom{i}@example.com must return 0 bindings.");
+        }
+
+        // Assert: the dictionary must contain exactly 1 key (the real AOR).
+        // In the buggy implementation _bindings.Count == 1 + phantomCount.
+        _registrar.AorCount.ShouldBe(1,
+            $"Expected exactly 1 AOR key in the registrar but found {_registrar.AorCount}. " +
+            $"UnregisterAsync on unknown AORs must not insert phantom empty-list entries.");
     }
 
     private static SipRequest CreateRegisterRequest(string to, string contact)
