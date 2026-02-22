@@ -242,6 +242,40 @@ public class InMemoryRegistrarTests
             $"Expected exactly {aorCount} bindings (one per AOR) but got {allBindings.Count}.");
     }
 
+    [Fact]
+    public async Task UnregisterAsync_UnknownAor_DoesNotCreatePhantomEntry()
+    {
+        // Arrange: one real AOR registered, then several never-registered AORs are
+        // unregistered.  The buggy AddOrUpdate add-factory inserts an empty
+        // ImmutableList for each unknown AOR, causing the dictionary to grow
+        // unboundedly.  We verify via InMemoryRegistrar.AorCount (internal) which
+        // directly exposes _bindings.Count without going through the public API's
+        // SelectMany filter that hides empty-list entries.
+        const int phantomCount = 5;
+        var realAor = "sip:real@example.com";
+        await _registrar.RegisterAsync(CreateRegisterRequest(realAor, "<sip:real@10.0.5.100:5060>"));
+
+        // Act: unregister multiple never-registered AORs.
+        for (var i = 1; i <= phantomCount; i++)
+        {
+            var phantomAor = $"sip:phantom{i}@example.com";
+            var result = await _registrar.UnregisterAsync(
+                CreateRegisterRequest(phantomAor, $"<sip:phantom{i}@10.0.5.{i}:5060>;expires=0"));
+
+            // Each call must succeed with an empty binding list.
+            result.IsSuccess.ShouldBeTrue();
+            result.Bindings.ShouldNotBeNull();
+            result.Bindings!.Count.ShouldBe(0,
+                $"UnregisterAsync on unknown AOR sip:phantom{i}@example.com must return 0 bindings.");
+        }
+
+        // Assert: the dictionary must contain exactly 1 key (the real AOR).
+        // In the buggy implementation _bindings.Count == 1 + phantomCount.
+        _registrar.AorCount.ShouldBe(1,
+            $"Expected exactly 1 AOR key in the registrar but found {_registrar.AorCount}. " +
+            $"UnregisterAsync on unknown AORs must not insert phantom empty-list entries.");
+    }
+
     private static SipRequest CreateRegisterRequest(string to, string contact)
     {
         return new SipRequest(

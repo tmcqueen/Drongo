@@ -72,12 +72,16 @@ public sealed class InMemoryRegistrar : IRegistrar
 
         var contacts = ParseContacts(request);
 
-        var remaining = _bindings.AddOrUpdate(
-            aorKey,
-            _ => ImmutableList<ContactBinding>.Empty,
-            (_, existing) =>
+        // Only update an existing entry — do not insert a phantom empty-list key for
+        // an AOR that was never registered.  TryGetValue + TryUpdate spin-loop is the
+        // correct lock-free pattern here: AddOrUpdate with an add-factory that returns
+        // ImmutableList.Empty would insert a phantom key for unknown AORs.
+        ImmutableList<ContactBinding> remaining;
+        if (_bindings.TryGetValue(aorKey, out var current))
+        {
+            while (true)
             {
-                var updated = existing;
+                var updated = current;
                 foreach (var contact in contacts)
                 {
                     updated = updated.RemoveAll(c =>
@@ -85,8 +89,40 @@ public sealed class InMemoryRegistrar : IRegistrar
                             contact.ContactUri.ToString(),
                             StringComparison.OrdinalIgnoreCase));
                 }
-                return updated;
-            });
+
+                // If nothing is left, remove the key entirely rather than leaving
+                // a phantom empty-list entry.  The KeyValuePair overload only removes
+                // the entry when its value still matches `current`, preventing a race
+                // where a concurrent registration could be accidentally deleted.
+                if (updated.IsEmpty)
+                {
+                    _bindings.TryRemove(new KeyValuePair<string, ImmutableList<ContactBinding>>(aorKey, current));
+                    remaining = ImmutableList<ContactBinding>.Empty;
+                    break;
+                }
+
+                // Attempt to atomically swap current → updated.  If another thread
+                // changed the value since our TryGetValue, retry with the new value.
+                if (_bindings.TryUpdate(aorKey, updated, current))
+                {
+                    remaining = updated;
+                    break;
+                }
+
+                // Value changed under us — reload and retry.
+                if (!_bindings.TryGetValue(aorKey, out current))
+                {
+                    // Key was removed by a concurrent wildcard unregister.
+                    remaining = ImmutableList<ContactBinding>.Empty;
+                    break;
+                }
+            }
+        }
+        else
+        {
+            // AOR was never registered — nothing to do, no phantom key created.
+            remaining = ImmutableList<ContactBinding>.Empty;
+        }
 
         var bindings = remaining
             .Where(b => !b.IsExpired)
@@ -110,6 +146,13 @@ public sealed class InMemoryRegistrar : IRegistrar
 
         return Task.FromResult<IReadOnlyList<ContactBinding>>(Array.Empty<ContactBinding>());
     }
+
+    /// <summary>
+    /// Returns the number of AOR keys currently tracked in the registrar.
+    /// Used in tests to verify that unregistration of unknown AORs does not
+    /// insert phantom empty-list entries that would cause unbounded growth.
+    /// </summary>
+    internal int AorCount => _bindings.Count;
 
     public Task<IReadOnlyList<ContactBinding>> GetAllBindingsAsync(CancellationToken ct = default)
     {
