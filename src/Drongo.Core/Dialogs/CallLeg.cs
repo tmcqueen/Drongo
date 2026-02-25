@@ -17,7 +17,11 @@ public sealed class CallLeg : ICallLeg
     public CallLegState State => _state;
     public string CallId { get; }
     public string LocalTag { get; }
-    public string? RemoteTag { get; set; }
+    /// <summary>
+    /// Remote tag from the peer, established during dialog creation per RFC3261.
+    /// Restricted to internal set to prevent external corruption of dialog identity.
+    /// </summary>
+    public string? RemoteTag { get; internal set; }
     public SipUri LocalUri { get; }
     public SipUri RemoteUri { get; }
     public bool IsSecure { get; }
