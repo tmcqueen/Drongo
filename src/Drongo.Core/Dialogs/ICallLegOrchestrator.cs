@@ -71,6 +71,16 @@ public interface ICallLegOrchestrator
     bool IsDialogConfirmed(string callId);
 
     /// <summary>
+    /// Route an in-dialog request (ACK, BYE, re-INVITE, etc.).
+    /// Per RFC3261 Section 12.2, in-dialog requests must match the dialog by tags and Call-ID.
+    /// ACK requests are NOT forwarded to the other leg; BYE and re-INVITE may be forwarded.
+    /// </summary>
+    /// <param name="callId">The Call-ID of the dialog</param>
+    /// <param name="request">The in-dialog request</param>
+    /// <returns>The modified request to forward to other leg, or null if should not be forwarded (e.g., ACK)</returns>
+    SipRequest? RouteInDialogRequest(string callId, SipRequest request);
+
+    /// <summary>
     /// Get the total number of active call leg pairs.
     /// </summary>
     long ActiveDialogCount { get; }

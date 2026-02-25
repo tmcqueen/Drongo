@@ -171,4 +171,33 @@ public sealed class CallLegOrchestrator : ICallLegOrchestrator
         // Dialog is confirmed when both legs are in confirmed state
         return uacLeg.IsEstablished() && uasLeg.IsEstablished();
     }
+
+    public SipRequest? RouteInDialogRequest(string callId, SipRequest request)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(callId);
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (!_dialogLegs.TryGetValue(callId, out var legs))
+        {
+            _logger.LogWarning("Dialog {CallId} not found for in-dialog request routing", callId);
+            return null;
+        }
+
+        // Per RFC3261 Section 12.2:
+        // ACK requests are not forwarded to the other leg; they acknowledge the 2xx response
+        if (request.Method == SipMethod.Ack)
+        {
+            _logger.LogDebug(
+                "ACK request for dialog {CallId} acknowledged (not forwarded to other leg)",
+                callId);
+            return null;  // ACK is consumed, not forwarded
+        }
+
+        // BYE and re-INVITE would be forwarded (to be implemented in future)
+        _logger.LogDebug(
+            "In-dialog {Method} request for dialog {CallId} not yet handled",
+            request.Method, callId);
+
+        return null;  // Placeholder: not forwarding other methods yet
+    }
 }
