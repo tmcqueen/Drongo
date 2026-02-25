@@ -1111,6 +1111,124 @@ public class CallLegOrchestratorTests
 
     #endregion
 
+    #region Late Response Handling Tests
+
+    [Fact]
+    public void HandleResponse_LateProvisionalAfter2xxConfirmation_StateRemainsConfirmed()
+    {
+        var (uacLeg, _) = CreateLegPair();
+
+        // Confirm dialog with 2xx
+        var confirm = new SipResponse(200, "OK", "SIP/2.0",
+            new Dictionary<string, string> { ["Call-ID"] = "call-123", ["CSeq"] = "1 INVITE" });
+        uacLeg.HandleResponse(confirm);
+        uacLeg.State.ShouldBe(CallLegState.Confirmed);
+
+        // Late 1xx should not downgrade state
+        var late1xx = new SipResponse(183, "Session Progress", "SIP/2.0",
+            new Dictionary<string, string> { ["Call-ID"] = "call-123", ["CSeq"] = "1 INVITE" });
+        uacLeg.HandleResponse(late1xx);
+
+        uacLeg.State.ShouldBe(CallLegState.Confirmed);
+    }
+
+    [Fact]
+    public void HandleResponse_Late3xxAfter2xxConfirmation_StateRemainsConfirmed()
+    {
+        var (uacLeg, _) = CreateLegPair();
+
+        // Confirm dialog
+        var confirm = new SipResponse(200, "OK", "SIP/2.0",
+            new Dictionary<string, string> { ["Call-ID"] = "call-123", ["CSeq"] = "1 INVITE" });
+        uacLeg.HandleResponse(confirm);
+        uacLeg.State.ShouldBe(CallLegState.Confirmed);
+
+        // Late 3xx after confirmation should not change state
+        var late3xx = new SipResponse(301, "Moved Permanently", "SIP/2.0",
+            new Dictionary<string, string> { ["Call-ID"] = "call-123", ["CSeq"] = "1 INVITE" });
+        uacLeg.HandleResponse(late3xx);
+
+        uacLeg.State.ShouldBe(CallLegState.Confirmed);
+    }
+
+    [Fact]
+    public void HandleResponse_Late4xxAfter2xxConfirmation_StateRemainsConfirmed()
+    {
+        var (uacLeg, _) = CreateLegPair();
+
+        // Confirm dialog
+        var confirm = new SipResponse(200, "OK", "SIP/2.0",
+            new Dictionary<string, string> { ["Call-ID"] = "call-123", ["CSeq"] = "1 INVITE" });
+        uacLeg.HandleResponse(confirm);
+        uacLeg.State.ShouldBe(CallLegState.Confirmed);
+
+        // Late 4xx after confirmation should not change state
+        var late4xx = new SipResponse(486, "Busy Here", "SIP/2.0",
+            new Dictionary<string, string> { ["Call-ID"] = "call-123", ["CSeq"] = "1 INVITE" });
+        uacLeg.HandleResponse(late4xx);
+
+        uacLeg.State.ShouldBe(CallLegState.Confirmed);
+    }
+
+    [Fact]
+    public void HandleResponse_Late5xxAfter2xxConfirmation_StateRemainsConfirmed()
+    {
+        var (uacLeg, _) = CreateLegPair();
+
+        // Confirm dialog
+        var confirm = new SipResponse(200, "OK", "SIP/2.0",
+            new Dictionary<string, string> { ["Call-ID"] = "call-123", ["CSeq"] = "1 INVITE" });
+        uacLeg.HandleResponse(confirm);
+        uacLeg.State.ShouldBe(CallLegState.Confirmed);
+
+        // Late 5xx should not change state
+        var late5xx = new SipResponse(500, "Server Internal Error", "SIP/2.0",
+            new Dictionary<string, string> { ["Call-ID"] = "call-123", ["CSeq"] = "1 INVITE" });
+        uacLeg.HandleResponse(late5xx);
+
+        uacLeg.State.ShouldBe(CallLegState.Confirmed);
+    }
+
+    [Fact]
+    public void HandleResponse_Multiple2xxResponses_StateRemainsConfirmedAfterFirst()
+    {
+        var (uacLeg, _) = CreateLegPair();
+
+        // First 2xx confirms dialog
+        var confirm1 = new SipResponse(200, "OK", "SIP/2.0",
+            new Dictionary<string, string> { ["Call-ID"] = "call-123", ["CSeq"] = "1 INVITE" });
+        uacLeg.HandleResponse(confirm1);
+        uacLeg.State.ShouldBe(CallLegState.Confirmed);
+
+        // Second 2xx (duplicate/retransmission) should not change state
+        var confirm2 = new SipResponse(200, "OK", "SIP/2.0",
+            new Dictionary<string, string> { ["Call-ID"] = "call-123", ["CSeq"] = "1 INVITE" });
+        uacLeg.HandleResponse(confirm2);
+
+        uacLeg.State.ShouldBe(CallLegState.Confirmed);
+    }
+
+    [Fact]
+    public void HandleResponse_3xxDuringProvisionalState_TransitionsToFailed()
+    {
+        var (uacLeg, _) = CreateLegPair();
+
+        // Move to provisional
+        var provisional = new SipResponse(180, "Ringing", "SIP/2.0",
+            new Dictionary<string, string> { ["Call-ID"] = "call-123", ["CSeq"] = "1 INVITE" });
+        uacLeg.HandleResponse(provisional);
+        uacLeg.State.ShouldBe(CallLegState.ProvisionalResponse);
+
+        // 3xx response while in provisional should transition to Failed
+        var error3xx = new SipResponse(301, "Moved Permanently", "SIP/2.0",
+            new Dictionary<string, string> { ["Call-ID"] = "call-123", ["CSeq"] = "1 INVITE" });
+        uacLeg.HandleResponse(error3xx);
+
+        uacLeg.State.ShouldBe(CallLegState.Failed);
+    }
+
+    #endregion
+
     #region Helper Methods
 
     private (ICallLeg uac, ICallLeg uas) CreateLegPair()
