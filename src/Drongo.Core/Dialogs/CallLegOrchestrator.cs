@@ -48,7 +48,11 @@ public sealed class CallLegOrchestrator : ICallLegOrchestrator
             RemoteTag = uacTag
         };
 
-        _dialogLegs.TryAdd(callId, (uacLeg, uasLeg));
+        if (!_dialogLegs.TryAdd(callId, (uacLeg, uasLeg)))
+        {
+            throw new InvalidOperationException(
+                $"Call leg pair for Call-ID '{callId}' already exists");
+        }
 
         _logger.LogDebug(
             "Created call leg pair for dialog {CallId}: UAC={UacTag}, UAS={UasTag}",

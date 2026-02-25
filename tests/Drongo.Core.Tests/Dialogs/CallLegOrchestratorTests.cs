@@ -418,4 +418,46 @@ public class CallLegOrchestratorTests
 
         uacLeg.IsEstablished().ShouldBeTrue();
     }
+
+    /// <summary>
+    /// Drongo-2c5-b2-r1: CreateCallLegPair silently fails on duplicate CallId
+    /// TDD: Write failing tests first, then implement fix
+    /// </summary>
+    [Fact]
+    public void CreateCallLegPair_WithDuplicateCallId_ThrowsInvalidOperationException()
+    {
+        var callId = "call-123";
+        var uacUri = new SipUri("sip", "caller@example.com", 5060);
+        var uasUri = new SipUri("sip", "callee@example.com", 5060);
+
+        // Create first pair
+        _orchestrator.CreateCallLegPair(callId, "tag-1", "tag-2", uacUri, uasUri, false);
+
+        // Attempt to create another pair with same callId should throw
+        var ex = Should.Throw<InvalidOperationException>(() =>
+            _orchestrator.CreateCallLegPair(callId, "tag-3", "tag-4", uacUri, uasUri, false));
+
+        ex.Message.ShouldContain("already exists");
+    }
+
+    [Fact]
+    public void CreateCallLegPair_WithDuplicateCallId_OriginalPairUnchanged()
+    {
+        var callId = "call-123";
+        var uacUri = new SipUri("sip", "caller@example.com", 5060);
+        var uasUri = new SipUri("sip", "callee@example.com", 5060);
+
+        // Create first pair
+        var (originalUac, originalUas) = _orchestrator.CreateCallLegPair(
+            callId, "tag-1", "tag-2", uacUri, uasUri, false);
+
+        // Attempt to create another pair with same callId
+        Should.Throw<InvalidOperationException>(() =>
+            _orchestrator.CreateCallLegPair(callId, "tag-3", "tag-4", uacUri, uasUri, false));
+
+        // Verify original pair is still retrievable and unchanged
+        _orchestrator.TryGetCallLegs(callId, out var retrievedUac, out var retrievedUas).ShouldBeTrue();
+        retrievedUac!.LocalTag.ShouldBe("tag-1");
+        retrievedUas!.LocalTag.ShouldBe("tag-2");
+    }
 }
