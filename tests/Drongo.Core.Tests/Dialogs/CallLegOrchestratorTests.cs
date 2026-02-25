@@ -855,4 +855,271 @@ public class CallLegOrchestratorTests
     }
 
     #endregion
+
+    /// <summary>
+    /// RFC3261 Response Code Category Tests
+    /// TDD RED PHASE: Tests for all standard SIP response code ranges
+    /// Each response code category should transition to specific state per RFC3261
+    /// </summary>
+
+    #region RFC3261 1xx Provisional Response Tests
+
+    [Fact]
+    public void HandleResponse_With100Trying_TransitionsToProvisionalResponse()
+    {
+        var (uacLeg, _) = CreateLegPair();
+        var response = new SipResponse(100, "Trying", "SIP/2.0",
+            new Dictionary<string, string> { ["Call-ID"] = "call-123", ["CSeq"] = "1 INVITE" });
+
+        uacLeg.HandleResponse(response);
+
+        uacLeg.State.ShouldBe(CallLegState.ProvisionalResponse);
+    }
+
+    [Fact]
+    public void HandleResponse_With180Ringing_TransitionsToProvisionalResponse()
+    {
+        var (uacLeg, _) = CreateLegPair();
+        var response = new SipResponse(180, "Ringing", "SIP/2.0",
+            new Dictionary<string, string> { ["Call-ID"] = "call-123", ["CSeq"] = "1 INVITE" });
+
+        uacLeg.HandleResponse(response);
+
+        uacLeg.State.ShouldBe(CallLegState.ProvisionalResponse);
+    }
+
+    [Fact]
+    public void HandleResponse_With181CallIsBeingForwarded_TransitionsToProvisionalResponse()
+    {
+        var (uacLeg, _) = CreateLegPair();
+        var response = new SipResponse(181, "Call Is Being Forwarded", "SIP/2.0",
+            new Dictionary<string, string> { ["Call-ID"] = "call-123", ["CSeq"] = "1 INVITE" });
+
+        uacLeg.HandleResponse(response);
+
+        uacLeg.State.ShouldBe(CallLegState.ProvisionalResponse);
+    }
+
+    [Fact]
+    public void HandleResponse_With183SessionProgress_TransitionsToProvisionalResponse()
+    {
+        var (uacLeg, _) = CreateLegPair();
+        var response = new SipResponse(183, "Session Progress", "SIP/2.0",
+            new Dictionary<string, string> { ["Call-ID"] = "call-123", ["CSeq"] = "1 INVITE" });
+
+        uacLeg.HandleResponse(response);
+
+        uacLeg.State.ShouldBe(CallLegState.ProvisionalResponse);
+    }
+
+    [Fact]
+    public void HandleResponse_Multiple1xxResponses_StateRemainsProvisionalResponse()
+    {
+        var (uacLeg, _) = CreateLegPair();
+        var response180 = new SipResponse(180, "Ringing", "SIP/2.0",
+            new Dictionary<string, string> { ["Call-ID"] = "call-123", ["CSeq"] = "1 INVITE" });
+        var response181 = new SipResponse(181, "Call Is Being Forwarded", "SIP/2.0",
+            new Dictionary<string, string> { ["Call-ID"] = "call-123", ["CSeq"] = "1 INVITE" });
+
+        uacLeg.HandleResponse(response180);
+        uacLeg.State.ShouldBe(CallLegState.ProvisionalResponse);
+
+        // Second 1xx should not change state
+        uacLeg.HandleResponse(response181);
+        uacLeg.State.ShouldBe(CallLegState.ProvisionalResponse);
+    }
+
+    #endregion
+
+    #region RFC3261 2xx Final Success Response Tests
+
+    [Fact]
+    public void HandleResponse_With200OK_TransitionsToConfirmed()
+    {
+        var (uacLeg, _) = CreateLegPair();
+        var response = new SipResponse(200, "OK", "SIP/2.0",
+            new Dictionary<string, string> { ["Call-ID"] = "call-123", ["CSeq"] = "1 INVITE" });
+
+        uacLeg.HandleResponse(response);
+
+        uacLeg.State.ShouldBe(CallLegState.Confirmed);
+    }
+
+    [Fact]
+    public void HandleResponse_With2xxFromProvisionalState_TransitionsToConfirmed()
+    {
+        var (uacLeg, _) = CreateLegPair();
+        var provisional = new SipResponse(183, "Session Progress", "SIP/2.0",
+            new Dictionary<string, string> { ["Call-ID"] = "call-123", ["CSeq"] = "1 INVITE" });
+        var final = new SipResponse(200, "OK", "SIP/2.0",
+            new Dictionary<string, string> { ["Call-ID"] = "call-123", ["CSeq"] = "1 INVITE" });
+
+        uacLeg.HandleResponse(provisional);
+        uacLeg.State.ShouldBe(CallLegState.ProvisionalResponse);
+
+        uacLeg.HandleResponse(final);
+        uacLeg.State.ShouldBe(CallLegState.Confirmed);
+    }
+
+    #endregion
+
+    #region RFC3261 3xx Redirection Response Tests
+
+    [Fact]
+    public void HandleResponse_With300MultipleChoices_TransitionsToFailed()
+    {
+        var (uacLeg, _) = CreateLegPair();
+        var response = new SipResponse(300, "Multiple Choices", "SIP/2.0",
+            new Dictionary<string, string> { ["Call-ID"] = "call-123", ["CSeq"] = "1 INVITE" });
+
+        uacLeg.HandleResponse(response);
+
+        uacLeg.State.ShouldBe(CallLegState.Failed);
+    }
+
+    [Fact]
+    public void HandleResponse_With301MovedPermanently_TransitionsToFailed()
+    {
+        var (uacLeg, _) = CreateLegPair();
+        var response = new SipResponse(301, "Moved Permanently", "SIP/2.0",
+            new Dictionary<string, string> { ["Call-ID"] = "call-123", ["CSeq"] = "1 INVITE" });
+
+        uacLeg.HandleResponse(response);
+
+        uacLeg.State.ShouldBe(CallLegState.Failed);
+    }
+
+    [Fact]
+    public void HandleResponse_With380AlternativeService_TransitionsToFailed()
+    {
+        var (uacLeg, _) = CreateLegPair();
+        var response = new SipResponse(380, "Alternative Service", "SIP/2.0",
+            new Dictionary<string, string> { ["Call-ID"] = "call-123", ["CSeq"] = "1 INVITE" });
+
+        uacLeg.HandleResponse(response);
+
+        uacLeg.State.ShouldBe(CallLegState.Failed);
+    }
+
+    #endregion
+
+    #region RFC3261 4xx Client Error Response Tests
+
+    [Fact]
+    public void HandleResponse_With400BadRequest_TransitionsToFailed()
+    {
+        var (uacLeg, _) = CreateLegPair();
+        var response = new SipResponse(400, "Bad Request", "SIP/2.0",
+            new Dictionary<string, string> { ["Call-ID"] = "call-123", ["CSeq"] = "1 INVITE" });
+
+        uacLeg.HandleResponse(response);
+
+        uacLeg.State.ShouldBe(CallLegState.Failed);
+    }
+
+    [Fact]
+    public void HandleResponse_With403Forbidden_TransitionsToFailed()
+    {
+        var (uacLeg, _) = CreateLegPair();
+        var response = new SipResponse(403, "Forbidden", "SIP/2.0",
+            new Dictionary<string, string> { ["Call-ID"] = "call-123", ["CSeq"] = "1 INVITE" });
+
+        uacLeg.HandleResponse(response);
+
+        uacLeg.State.ShouldBe(CallLegState.Failed);
+    }
+
+    [Fact]
+    public void HandleResponse_With404NotFound_TransitionsToFailed()
+    {
+        var (uacLeg, _) = CreateLegPair();
+        var response = new SipResponse(404, "Not Found", "SIP/2.0",
+            new Dictionary<string, string> { ["Call-ID"] = "call-123", ["CSeq"] = "1 INVITE" });
+
+        uacLeg.HandleResponse(response);
+
+        uacLeg.State.ShouldBe(CallLegState.Failed);
+    }
+
+    [Fact]
+    public void HandleResponse_With486BusyHere_TransitionsToFailed()
+    {
+        var (uacLeg, _) = CreateLegPair();
+        var response = new SipResponse(486, "Busy Here", "SIP/2.0",
+            new Dictionary<string, string> { ["Call-ID"] = "call-123", ["CSeq"] = "1 INVITE" });
+
+        uacLeg.HandleResponse(response);
+
+        uacLeg.State.ShouldBe(CallLegState.Failed);
+    }
+
+    #endregion
+
+    #region RFC3261 5xx Server Error Response Tests
+
+    [Fact]
+    public void HandleResponse_With500ServerInternalError_TransitionsToFailed()
+    {
+        var (uacLeg, _) = CreateLegPair();
+        var response = new SipResponse(500, "Server Internal Error", "SIP/2.0",
+            new Dictionary<string, string> { ["Call-ID"] = "call-123", ["CSeq"] = "1 INVITE" });
+
+        uacLeg.HandleResponse(response);
+
+        uacLeg.State.ShouldBe(CallLegState.Failed);
+    }
+
+    [Fact]
+    public void HandleResponse_With503ServiceUnavailable_TransitionsToFailed()
+    {
+        var (uacLeg, _) = CreateLegPair();
+        var response = new SipResponse(503, "Service Unavailable", "SIP/2.0",
+            new Dictionary<string, string> { ["Call-ID"] = "call-123", ["CSeq"] = "1 INVITE" });
+
+        uacLeg.HandleResponse(response);
+
+        uacLeg.State.ShouldBe(CallLegState.Failed);
+    }
+
+    #endregion
+
+    #region RFC3261 6xx Global Failure Response Tests
+
+    [Fact]
+    public void HandleResponse_With600BusyEverywhere_TransitionsToFailed()
+    {
+        var (uacLeg, _) = CreateLegPair();
+        var response = new SipResponse(600, "Busy Everywhere", "SIP/2.0",
+            new Dictionary<string, string> { ["Call-ID"] = "call-123", ["CSeq"] = "1 INVITE" });
+
+        uacLeg.HandleResponse(response);
+
+        uacLeg.State.ShouldBe(CallLegState.Failed);
+    }
+
+    [Fact]
+    public void HandleResponse_With603Decline_TransitionsToFailed()
+    {
+        var (uacLeg, _) = CreateLegPair();
+        var response = new SipResponse(603, "Decline", "SIP/2.0",
+            new Dictionary<string, string> { ["Call-ID"] = "call-123", ["CSeq"] = "1 INVITE" });
+
+        uacLeg.HandleResponse(response);
+
+        uacLeg.State.ShouldBe(CallLegState.Failed);
+    }
+
+    #endregion
+
+    #region Helper Methods
+
+    private (ICallLeg uac, ICallLeg uas) CreateLegPair()
+    {
+        var callId = $"call-{Guid.NewGuid()}";
+        var uacUri = new SipUri("sip", "alice@example.com", 5060);
+        var uasUri = new SipUri("sip", "bob@example.com", 5060);
+        return _orchestrator.CreateCallLegPair(callId, "tag-1", "tag-2", uacUri, uasUri, false);
+    }
+
+    #endregion
 }
