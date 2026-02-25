@@ -10,3 +10,6 @@ obj/
 .bv/
 
 .beads.new/
+
+# Claude Code worktrees and local data
+.claude/
