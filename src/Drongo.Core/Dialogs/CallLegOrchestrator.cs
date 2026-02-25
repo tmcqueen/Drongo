@@ -79,8 +79,9 @@ public sealed class CallLegOrchestrator : ICallLegOrchestrator
             "Routing provisional response {StatusCode} from UAS to UAC for dialog {CallId}",
             response.StatusCode, callId);
 
-        // Update UAS leg state
+        // Update both legs symmetrically per RFC3261 Section 12.1
         uasLeg.HandleResponse(response);
+        uacLeg.HandleResponse(response);
 
         // Return response to be sent to UAC
         return response;
@@ -106,9 +107,9 @@ public sealed class CallLegOrchestrator : ICallLegOrchestrator
                 "Dialog {CallId} confirmed with {StatusCode} response",
                 callId, response.StatusCode);
 
-            // Update both legs to confirmed state
+            // Update both legs symmetrically using HandleResponse per RFC3261 Section 12.1
             uasLeg.HandleResponse(response);
-            uacLeg.TransitionToState(CallLegState.Confirmed);
+            uacLeg.HandleResponse(response);
         }
 
         return response;
@@ -125,14 +126,16 @@ public sealed class CallLegOrchestrator : ICallLegOrchestrator
             return null;
         }
 
-        var (_, uasLeg) = legs;
+        var (uacLeg, uasLeg) = legs;
 
         // Error responses (3xx-6xx) are forwarded but don't confirm dialog
         _logger.LogDebug(
             "Routing error response {StatusCode} from UAS to UAC for dialog {CallId}",
             response.StatusCode, callId);
 
+        // Update both legs symmetrically per RFC3261 Section 12.1
         uasLeg.HandleResponse(response);
+        uacLeg.HandleResponse(response);
 
         return response;
     }

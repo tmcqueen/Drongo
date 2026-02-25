@@ -579,4 +579,90 @@ public class CallLegOrchestratorTests
         // Tag should remain unchanged
         uacLeg.RemoteTag.ShouldBe(originalTag);
     }
+
+    /// <summary>
+    /// Drongo-2c5-b2-r4: Asymmetric leg state updates when routing responses
+    /// TDD: Verify both legs are updated symmetrically during routing
+    /// </summary>
+    [Fact]
+    public void RouteProvisionalResponse_UpdatesBothLegs()
+    {
+        var callId = "call-123";
+        var uacUri = new SipUri("sip", "caller@example.com", 5060);
+        var uasUri = new SipUri("sip", "callee@example.com", 5060);
+
+        var (uacLeg, uasLeg) = _orchestrator.CreateCallLegPair(
+            callId, "tag-1", "tag-2", uacUri, uasUri, false);
+
+        var provisional = new SipResponse(183, "Session Progress", "SIP/2.0",
+            new Dictionary<string, string>
+            {
+                ["Call-ID"] = callId,
+                ["CSeq"] = "1 INVITE"
+            });
+
+        _orchestrator.RouteProvisionalResponse(callId, provisional);
+
+        // Both legs should be updated to ProvisionalResponse state
+        uacLeg.State.ShouldBe(CallLegState.ProvisionalResponse);
+        uasLeg.State.ShouldBe(CallLegState.ProvisionalResponse);
+    }
+
+    [Fact]
+    public void RouteFinalResponse_UpdatesBothLegsSymmetrically()
+    {
+        var callId = "call-123";
+        var uacUri = new SipUri("sip", "caller@example.com", 5060);
+        var uasUri = new SipUri("sip", "callee@example.com", 5060);
+
+        var (uacLeg, uasLeg) = _orchestrator.CreateCallLegPair(
+            callId, "tag-1", "tag-2", uacUri, uasUri, false);
+
+        // Send provisional response first to move to ProvisionalResponse state
+        var provisional = new SipResponse(183, "Session Progress", "SIP/2.0",
+            new Dictionary<string, string>
+            {
+                ["Call-ID"] = callId,
+                ["CSeq"] = "1 INVITE"
+            });
+        _orchestrator.RouteProvisionalResponse(callId, provisional);
+
+        // Now send final response
+        var final = new SipResponse(200, "OK", "SIP/2.0",
+            new Dictionary<string, string>
+            {
+                ["Call-ID"] = callId,
+                ["CSeq"] = "1 INVITE"
+            });
+
+        _orchestrator.RouteFinalResponse(callId, final);
+
+        // Both legs should be in Confirmed state using same method (HandleResponse)
+        uacLeg.State.ShouldBe(CallLegState.Confirmed);
+        uasLeg.State.ShouldBe(CallLegState.Confirmed);
+    }
+
+    [Fact]
+    public void RouteErrorResponse_UpdatesBothLegs()
+    {
+        var callId = "call-123";
+        var uacUri = new SipUri("sip", "caller@example.com", 5060);
+        var uasUri = new SipUri("sip", "callee@example.com", 5060);
+
+        var (uacLeg, uasLeg) = _orchestrator.CreateCallLegPair(
+            callId, "tag-1", "tag-2", uacUri, uasUri, false);
+
+        var errorResponse = new SipResponse(486, "Busy Here", "SIP/2.0",
+            new Dictionary<string, string>
+            {
+                ["Call-ID"] = callId,
+                ["CSeq"] = "1 INVITE"
+            });
+
+        _orchestrator.RouteErrorResponse(callId, errorResponse);
+
+        // Both legs should be updated to Failed state
+        uacLeg.State.ShouldBe(CallLegState.Failed);
+        uasLeg.State.ShouldBe(CallLegState.Failed);
+    }
 }
