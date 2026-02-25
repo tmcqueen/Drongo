@@ -142,11 +142,10 @@ public sealed class CallLegOrchestrator : ICallLegOrchestrator
 
     public bool TryGetCallLegs(string callId, out ICallLeg? uacLeg, out ICallLeg? uasLeg)
     {
+        ArgumentException.ThrowIfNullOrEmpty(callId);
+
         uacLeg = null;
         uasLeg = null;
-
-        if (string.IsNullOrEmpty(callId))
-            return false;
 
         if (_dialogLegs.TryGetValue(callId, out var legs))
         {
