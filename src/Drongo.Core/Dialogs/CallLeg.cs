@@ -73,14 +73,27 @@ public sealed class CallLeg : ICallLeg
             response.StatusCode,
             LocalTag);
 
-        // Update state based on response status code per RFC3261 Section 12
-        _state = response.StatusCode switch
+        // Determine target state based on response status code per RFC3261 Section 12
+        var targetState = response.StatusCode switch
         {
             >= 100 and < 200 => CallLegState.ProvisionalResponse,
             >= 200 and < 300 => CallLegState.Confirmed,
             >= 300 => CallLegState.Failed,
             _ => _state
         };
+
+        // Only transition if it's a valid forward transition
+        if (IsValidTransition(_state, targetState))
+        {
+            _state = targetState;
+        }
+        else if (targetState != _state)
+        {
+            // Log warning for invalid transition (e.g., late provisional after confirmed)
+            _logger.LogWarning(
+                "Attempted invalid state transition from {CurrentState} to {TargetState} on leg {LocalTag}",
+                _state, targetState, LocalTag);
+        }
     }
 
     public long GetNextSequenceNumber()
@@ -107,12 +120,62 @@ public sealed class CallLeg : ICallLeg
 
     /// <summary>
     /// Transition the leg to a specific state.
+    /// Per RFC3261, only forward state transitions are allowed.
     /// </summary>
     /// <param name="newState">The new state to transition to</param>
+    /// <exception cref="InvalidOperationException">Thrown if transition is invalid or backward</exception>
     internal void TransitionToState(CallLegState newState)
     {
+        if (!IsValidTransition(_state, newState))
+        {
+            throw new InvalidOperationException(
+                $"Invalid state transition from {_state} to {newState} on leg {LocalTag}");
+        }
+
         _logger.LogDebug("Leg {LocalTag} transitioning from {OldState} to {NewState}",
             LocalTag, _state, newState);
         _state = newState;
+    }
+
+    /// <summary>
+    /// Validates if a state transition is legal per RFC3261 Section 12.
+    /// Prevents backward transitions and invalid state progressions.
+    /// </summary>
+    /// <param name="currentState">The current state</param>
+    /// <param name="targetState">The desired target state</param>
+    /// <returns>True if transition is valid, false otherwise</returns>
+    private static bool IsValidTransition(CallLegState currentState, CallLegState targetState)
+    {
+        // Same state is always valid (no-op)
+        if (currentState == targetState)
+            return true;
+
+        // Valid forward transitions per RFC3261 Section 12
+        return (currentState, targetState) switch
+        {
+            // Initial transitions
+            (CallLegState.Initial, CallLegState.Inviting) => true,
+
+            // Early dialog (1xx responses)
+            (CallLegState.Initial, CallLegState.ProvisionalResponse) => true,
+            (CallLegState.Inviting, CallLegState.ProvisionalResponse) => true,
+
+            // Dialog confirmation (2xx responses)
+            (CallLegState.Initial, CallLegState.Confirmed) => true,
+            (CallLegState.Inviting, CallLegState.Confirmed) => true,
+            (CallLegState.ProvisionalResponse, CallLegState.Confirmed) => true,
+
+            // Dialog failure (3xx-6xx responses)
+            (CallLegState.Initial, CallLegState.Failed) => true,
+            (CallLegState.Inviting, CallLegState.Failed) => true,
+            (CallLegState.ProvisionalResponse, CallLegState.Failed) => true,
+
+            // Dialog termination
+            (CallLegState.Confirmed, CallLegState.Terminating) => true,
+            (CallLegState.Terminating, CallLegState.Terminated) => true,
+
+            // All other transitions are invalid (including backward transitions)
+            _ => false
+        };
     }
 }

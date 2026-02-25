@@ -420,6 +420,77 @@ public class CallLegOrchestratorTests
     }
 
     /// <summary>
+    /// Drongo-2c5-b2-r2: CallLeg allows backward and invalid state transitions
+    /// TDD: Write failing tests first, then implement fix
+    /// </summary>
+    [Fact]
+    public void TransitionToState_FromConfirmedToInitial_ThrowsInvalidOperationException()
+    {
+        var callId = "call-123";
+        var uacUri = new SipUri("sip", "caller@example.com", 5060);
+        var uasUri = new SipUri("sip", "callee@example.com", 5060);
+
+        var (uacLeg, _) = _orchestrator.CreateCallLegPair(
+            callId, "tag-1", "tag-2", uacUri, uasUri, false);
+
+        // Manually transition leg to Confirmed (simulating normal flow)
+        var confirmResponse = new SipResponse(
+            200, "OK", "SIP/2.0",
+            new Dictionary<string, string>
+            {
+                ["Via"] = "SIP/2.0/UDP 192.0.2.2:5060",
+                ["From"] = "Alice <sip:caller@example.com>;tag=tag-1",
+                ["To"] = "Bob <sip:callee@example.com>;tag=tag-2",
+                ["Call-ID"] = callId,
+                ["CSeq"] = "1 INVITE"
+            });
+        uacLeg.HandleResponse(confirmResponse);
+        uacLeg.State.ShouldBe(CallLegState.Confirmed);
+
+        // Attempting backward transition should throw
+        Should.Throw<InvalidOperationException>(() =>
+            ((CallLeg)uacLeg).TransitionToState(CallLegState.Initial));
+    }
+
+    [Fact]
+    public void HandleResponse_WithLateProvisionalAfterConfirmed_StateRemainsConfirmed()
+    {
+        var callId = "call-123";
+        var uacUri = new SipUri("sip", "caller@example.com", 5060);
+        var uasUri = new SipUri("sip", "callee@example.com", 5060);
+
+        var (uacLeg, _) = _orchestrator.CreateCallLegPair(
+            callId, "tag-1", "tag-2", uacUri, uasUri, false);
+
+        // Transition to Confirmed
+        var confirmResponse = new SipResponse(200, "OK", "SIP/2.0",
+            new Dictionary<string, string>
+            {
+                ["Via"] = "SIP/2.0/UDP 192.0.2.2:5060",
+                ["From"] = "Alice <sip:caller@example.com>;tag=tag-1",
+                ["To"] = "Bob <sip:callee@example.com>;tag=tag-2",
+                ["Call-ID"] = callId,
+                ["CSeq"] = "1 INVITE"
+            });
+        uacLeg.HandleResponse(confirmResponse);
+        uacLeg.State.ShouldBe(CallLegState.Confirmed);
+
+        // Late provisional (183) should NOT downgrade state
+        var lateProvisional = new SipResponse(183, "Session Progress", "SIP/2.0",
+            new Dictionary<string, string>
+            {
+                ["Via"] = "SIP/2.0/UDP 192.0.2.2:5060",
+                ["From"] = "Alice <sip:caller@example.com>;tag=tag-1",
+                ["To"] = "Bob <sip:callee@example.com>;tag=tag-2",
+                ["Call-ID"] = callId,
+                ["CSeq"] = "1 INVITE"
+            });
+        uacLeg.HandleResponse(lateProvisional);
+
+        uacLeg.State.ShouldBe(CallLegState.Confirmed);
+    }
+
+    /// <summary>
     /// Drongo-2c5-b2-r1: CreateCallLegPair silently fails on duplicate CallId
     /// TDD: Write failing tests first, then implement fix
     /// </summary>
