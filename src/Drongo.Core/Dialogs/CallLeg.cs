@@ -66,6 +66,16 @@ public sealed class CallLeg : ICallLeg
     {
         ArgumentNullException.ThrowIfNull(request);
         _logger.LogDebug("Handling request {Method} on leg {LocalTag}", request.Method, LocalTag);
+
+        // Per RFC3261 Section 12: INVITE transitions leg from Initial to Inviting
+        if (request.Method == SipMethod.Invite)
+        {
+            if (IsValidTransition(_state, CallLegState.Inviting))
+            {
+                _state = CallLegState.Inviting;
+                _logger.LogDebug("Leg {LocalTag} transitioned to Inviting state on INVITE", LocalTag);
+            }
+        }
     }
 
     public void HandleResponse(SipResponse response)
