@@ -1,0 +1,125 @@
+project: Drongo
+description: .NET-native SIP (Session Initiation Protocol) runtime with ASP.NET Core patterns
+tech_stack:
+  - .NET 10+
+  - C# 13+
+  - NAudio (media)
+  - Microsoft.Extensions.* (hosting, DI, logging)
+
+quick_start:
+  - "1. Read overview.md for architecture context"
+  - "2. Run: dotnet build && dotnet test"
+  - "3. Check BEADS_WORKFLOW.md to claim a task"
+
+development:
+  building_and_testing: BUILDING_AND_TESTING.md
+  code_style: CODE_STYLE.md
+  commit_guidelines: COMMIT_GUIDELINES.md
+  session_completion: SESSION_COMPLETION.md
+  beads_workflow: BEADS_WORKFLOW.md
+  agent_instructions: AGENT_INSTRUCTIONS.md
+
+architecture:
+  overview: overview.md
+  api_surface: api-surface.md
+  concurrency: concurrency.md
+  distributed: distributed-architecture.md
+  rfc_reference: RFC_REFERENCE.md
+  additional_resources: ADDITIONAL_RESOURCES.md
+
+internals:
+  core: internals/Drongo.Core/Index.md
+  media: internals/Drongo.Media/Index.md
+  host: internals/Drongo/Index.md
+
+use_cases:
+  how_build: BUILDING_AND_TESTING.md#build-commands
+  how_test: BUILDING_AND_TESTING.md#test-commands
+  how_format: CODE_STYLE.md#naming-conventions
+  how_write_commit: COMMIT_GUIDELINES.md
+  how_end_session: SESSION_COMPLETION.md
+  how_claim_task: BEADS_WORKFLOW.md#workflow-pattern
+  how_document: AGENT_INSTRUCTIONS.md
+
+what_is:
+  architecture: overview.md
+  public_api: api-surface.md
+  sip_protocol: RFC_REFERENCE.md
+  concurrency: concurrency.md
+  dialogs: internals/Drongo.Core/
+
+implement:
+  sip_feature:
+    - Check RFC_REFERENCE.md
+    - Consult internals/Drongo.Core/
+    - Follow CODE_STYLE.md SIP conventions
+  async_code: CODE_STYLE.md#async-patterns
+  new_api: api-surface.md
+  tests: BUILDING_AND_TESTING.md#testing-guidelines
+
+critical_rules:
+  session_completion:
+    priority: MANDATORY
+    reason: Work is NOT complete until git push succeeds
+    guide: SESSION_COMPLETION.md
+  testing:
+    rule: ALL tests must pass before pushing
+    emphasis: UNDER NO CIRCUMSTANCES should a task close without tests
+  async_code:
+    rule: ALWAYS await Tasks
+    wrong: "task.Result or task.Wait()"
+    right: "await task"
+    guide: CODE_STYLE.md#async-patterns
+  beads:
+    rule: Always use beads for multi-session work
+    commands:
+      find: bd ready
+      claim: bd update <id> --status=in_progress
+      complete: bd close <id> --reason=Description
+      sync: bd sync
+
+essential_commands:
+  development:
+    build: dotnet build
+    test: dotnet test
+    format: dotnet format
+    run: dotnet run --project src/Drongo/Drongo.csproj
+  workflow:
+    find_work: bd ready
+    claim: bd update <id> --status=in_progress
+    close: bd close <id> --reason=Description
+    sync_beads: bd sync
+  session_end:
+    - git pull --rebase
+    - bd sync
+    - git push
+    - git status (must show "working tree clean")
+
+document_map:
+  root:
+    index.yaml: Navigation hub (this file)
+    overview.md: Architecture
+    api-surface.md: API reference
+    concurrency.md: Threading
+    distributed-architecture.md: Multi-instance
+  guides:
+    BUILDING_AND_TESTING.md: Build & test
+    CODE_STYLE.md: Style guide
+    COMMIT_GUIDELINES.md: Commit format
+    SESSION_COMPLETION.md: Session workflow ⚠️ CRITICAL
+    BEADS_WORKFLOW.md: Issue tracking
+    AGENT_INSTRUCTIONS.md: Documentation standards
+    RFC_REFERENCE.md: Protocol reference
+    ADDITIONAL_RESOURCES.md: Links & resources
+  protocols:
+    rfcs/rfc3261/: SIP protocol docs
+  component_docs:
+    internals/Drongo.Core/: Core SIP engine
+    internals/Drongo.Media/: Media sessions
+    internals/Drongo/: Main host
+
+remember:
+  - Check SESSION_COMPLETION.md before ending your session
+  - All tests must pass before pushing
+  - git push is mandatory
+  - Ask docs before guessing

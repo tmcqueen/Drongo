@@ -1,5 +1,8 @@
 <Solution>
   <Project Path="src\Drongo\Drongo.csproj" />
+  <Folder Name="/tests/">
+    <Project Path="tests/Drongo.Foo.Tests/Drongo.Foo.Tests.csproj" />
+  </Folder>
   <Project Path="src\Drongo.Core\Drongo.Core.csproj" />
   <Project Path="src\Drongo.Media\Drongo.Media.csproj" />
   <Project Path="tests\Drongo.Core.Tests\Drongo.Core.Tests.csproj" />
