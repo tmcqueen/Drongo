@@ -257,8 +257,8 @@ public partial class CallLegOrchestratorTests_InDialog
 
         // For now, implementation returns null (placeholder)
         // After r2 implementation, this should return the forwarded BYE request
-        // result.ShouldNotBeNull();
-        // result!.Method.ShouldBe(SipMethod.Bye);
+        result.ShouldNotBeNull();
+        result!.Method.ShouldBe(SipMethod.Bye);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -313,8 +313,8 @@ public partial class CallLegOrchestratorTests_InDialog
 
         // For now, implementation returns null (placeholder)
         // After r3 implementation, this should return the forwarded re-INVITE
-        // result.ShouldNotBeNull();
-        // result!.Method.ShouldBe(SipMethod.Invite);
+        result.ShouldNotBeNull();
+        result!.Method.ShouldBe(SipMethod.Invite);
     }
 
     // ─────────────────────────────────────────────────────────────────────────

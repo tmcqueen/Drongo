@@ -193,7 +193,27 @@ public sealed class CallLegOrchestrator : ICallLegOrchestrator
             return null;  // ACK is consumed, not forwarded
         }
 
-        // BYE and re-INVITE would be forwarded (to be implemented in future)
+        // Per RFC3261 Section 12.2:
+        // BYE requests terminate the dialog and are forwarded to the other leg
+        if (request.Method == SipMethod.Bye)
+        {
+            _logger.LogDebug(
+                "BYE request for dialog {CallId} forwarded to other leg",
+                callId);
+            return request;  // BYE is forwarded to other leg
+        }
+
+        // Per RFC3261 Section 14:
+        // re-INVITE requests allow mid-dialog offer/answer and are forwarded to the other leg
+        if (request.Method == SipMethod.Invite)
+        {
+            _logger.LogDebug(
+                "re-INVITE request for dialog {CallId} forwarded to other leg",
+                callId);
+            return request;  // re-INVITE is forwarded to other leg
+        }
+
+        // Other in-dialog requests (to be implemented)
         _logger.LogDebug(
             "In-dialog {Method} request for dialog {CallId} not yet handled",
             request.Method, callId);
