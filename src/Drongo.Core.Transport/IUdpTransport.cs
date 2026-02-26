@@ -1,6 +1,6 @@
 using System.Net;
-using Drongo.Core.Messages;
-using Drongo.Core.Parsing;
+using Drongo.Core.SIP.Messages;
+using Drongo.Core.SIP.Parsing;
 
 namespace Drongo.Core.Transport;
 

@@ -2,8 +2,8 @@ using System.Buffers;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading.Channels;
-using Drongo.Core.Messages;
-using Drongo.Core.Parsing;
+using Drongo.Core.SIP.Messages;
+using Drongo.Core.SIP.Parsing;
 using Microsoft.Extensions.Logging;
 
 namespace Drongo.Core.Transport;
