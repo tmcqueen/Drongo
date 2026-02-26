@@ -1,6 +1,6 @@
-using Drongo.Core.Dialogs;
+using Drongo.Core.SIP.Dialogs;
 using Drongo.Core.Hosting;
-using Drongo.Core.Messages;
+using Drongo.Core.SIP.Messages;
 using Microsoft.Extensions.Logging;
 using Shouldly;
 using Xunit;

@@ -1,4 +1,4 @@
-using Drongo.Core.Dialogs;
+using Drongo.Core.SIP.Dialogs;
 using Shouldly;
 using Xunit;
 

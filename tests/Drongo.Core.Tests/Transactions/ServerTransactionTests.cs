@@ -1,12 +1,12 @@
 using System.Net;
-using Drongo.Core.Messages;
-using Drongo.Core.Timers;
-using Drongo.Core.Transactions;
+using Drongo.Core.SIP.Messages;
+using Drongo.Core.SIP.Timers;
+using Drongo.Core.SIP.Transactions;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 using Xunit;
 using Shouldly;
-using ITimer = Drongo.Core.Timers.ITimer;
+using ITimer = Drongo.Core.SIP.Timers.ITimer;
 
 namespace Drongo.Core.Tests.Transactions;
 

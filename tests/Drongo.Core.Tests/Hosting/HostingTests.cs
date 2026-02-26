@@ -1,8 +1,8 @@
 using System.Net;
 using System.Net.Sockets;
 using Drongo.Core.Hosting;
-using Drongo.Core.Messages;
-using Drongo.Core.Registration;
+using Drongo.Core.SIP.Messages;
+using Drongo.Core.SIP.Registration;
 using NSubstitute;
 using Xunit;
 using Shouldly;

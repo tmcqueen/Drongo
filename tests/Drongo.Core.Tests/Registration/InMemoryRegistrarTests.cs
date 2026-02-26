@@ -1,5 +1,5 @@
-using Drongo.Core.Messages;
-using Drongo.Core.Registration;
+using Drongo.Core.SIP.Messages;
+using Drongo.Core.SIP.Registration;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 using Shouldly;

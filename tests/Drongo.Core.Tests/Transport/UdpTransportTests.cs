@@ -1,7 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
-using Drongo.Core.Parsing;
+using Drongo.Core.SIP.Parsing;
 using Drongo.Core.Transport;
 using Microsoft.Extensions.Logging;
 using NSubstitute;

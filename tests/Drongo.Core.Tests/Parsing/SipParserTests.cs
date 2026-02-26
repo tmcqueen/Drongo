@@ -1,6 +1,6 @@
 using System.Buffers;
-using Drongo.Core.Parsing;
-using Drongo.Core.Messages;
+using Drongo.Core.SIP.Parsing;
+using Drongo.Core.SIP.Messages;
 using Xunit;
 using Shouldly;
 
