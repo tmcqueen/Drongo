@@ -101,15 +101,30 @@ public sealed class CallLegOrchestrator : ICallLegOrchestrator
         var (uacLeg, uasLeg) = legs;
 
         // Final response (2xx) confirms the dialog per RFC3261 Section 12.1.1
+        // OR acknowledges BYE request terminating the dialog per RFC3261 Section 12.2.1.3
         if (response.StatusCode is >= 200 and < 300)
         {
-            _logger.LogInformation(
-                "Dialog {CallId} confirmed with {StatusCode} response",
-                callId, response.StatusCode);
+            // Check if both legs are in Terminating state (response to BYE)
+            if (uacLeg.State == CallLegState.Terminating && uasLeg.State == CallLegState.Terminating)
+            {
+                _logger.LogInformation(
+                    "BYE acknowledged for dialog {CallId}; transitioning both legs to Terminated",
+                    callId);
 
-            // Update both legs symmetrically using HandleResponse per RFC3261 Section 12.1
-            uasLeg.HandleResponse(response);
-            uacLeg.HandleResponse(response);
+                // Transition both legs to Terminated state per RFC3261 Section 12.2.1.3
+                uacLeg.TransitionToState(CallLegState.Terminated);
+                uasLeg.TransitionToState(CallLegState.Terminated);
+            }
+            else
+            {
+                _logger.LogInformation(
+                    "Dialog {CallId} confirmed with {StatusCode} response",
+                    callId, response.StatusCode);
+
+                // Update both legs symmetrically using HandleResponse per RFC3261 Section 12.1
+                uasLeg.HandleResponse(response);
+                uacLeg.HandleResponse(response);
+            }
         }
 
         return response;
@@ -197,8 +212,14 @@ public sealed class CallLegOrchestrator : ICallLegOrchestrator
         // BYE requests terminate the dialog and are forwarded to the other leg
         if (request.Method == SipMethod.Bye)
         {
+            var (uacLeg, uasLeg) = legs;
+            
+            // Transition both legs to Terminating state per RFC3261 Section 12.2.1.2
+            uacLeg.TransitionToState(CallLegState.Terminating);
+            uasLeg.TransitionToState(CallLegState.Terminating);
+            
             _logger.LogDebug(
-                "BYE request for dialog {CallId} forwarded to other leg",
+                "BYE request for dialog {CallId} forwarded to other leg; both legs transitioning to Terminating",
                 callId);
             return request;  // BYE is forwarded to other leg
         }
