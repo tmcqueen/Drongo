@@ -1,9 +1,9 @@
 using System.Net;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Drongo.Core.Dialogs;
-using Drongo.Core.Parsing;
-using Drongo.Core.Registration;
+using Drongo.Core.SIP.Dialogs;
+using Drongo.Core.SIP.Parsing;
+using Drongo.Core.SIP.Registration;
 using Drongo.Core.Transport;
 using Drongo.Core.Hosting;
 
