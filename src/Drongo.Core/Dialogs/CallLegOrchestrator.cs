@@ -234,6 +234,26 @@ public sealed class CallLegOrchestrator : ICallLegOrchestrator
             return request;  // re-INVITE is forwarded to other leg
         }
 
+        // Per RFC 3311 Section 3:
+        // UPDATE requests allow mid-dialog offer/answer without re-INVITE
+        if (request.Method == SipMethod.Update)
+        {
+            _logger.LogDebug(
+                "UPDATE request for dialog {CallId} forwarded to other leg",
+                callId);
+            return request;  // UPDATE is forwarded to other leg
+        }
+
+        // Per RFC 3515 Section 2.4:
+        // REFER requests initiate call transfer and are forwarded to the other leg
+        if (request.Method == SipMethod.Refer)
+        {
+            _logger.LogDebug(
+                "REFER request for dialog {CallId} forwarded to other leg",
+                callId);
+            return request;  // REFER is forwarded to other leg
+        }
+
         // Other in-dialog requests (to be implemented)
         _logger.LogDebug(
             "In-dialog {Method} request for dialog {CallId} not yet handled",
