@@ -171,4 +171,53 @@ public sealed class CallLegOrchestrator : ICallLegOrchestrator
         // Dialog is confirmed when both legs are in confirmed state
         return uacLeg.IsEstablished() && uasLeg.IsEstablished();
     }
+
+    public SipRequest? RouteInDialogRequest(string callId, SipRequest request)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(callId);
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (!_dialogLegs.TryGetValue(callId, out var legs))
+        {
+            _logger.LogWarning("Dialog {CallId} not found for in-dialog request routing", callId);
+            return null;
+        }
+
+        // Per RFC3261 Section 12.2:
+        // ACK requests are not forwarded to the other leg; they acknowledge the 2xx response
+        if (request.Method == SipMethod.Ack)
+        {
+            _logger.LogDebug(
+                "ACK request for dialog {CallId} acknowledged (not forwarded to other leg)",
+                callId);
+            return null;  // ACK is consumed, not forwarded
+        }
+
+        // Per RFC3261 Section 12.2:
+        // BYE requests terminate the dialog and are forwarded to the other leg
+        if (request.Method == SipMethod.Bye)
+        {
+            _logger.LogDebug(
+                "BYE request for dialog {CallId} forwarded to other leg",
+                callId);
+            return request;  // BYE is forwarded to other leg
+        }
+
+        // Per RFC3261 Section 14:
+        // re-INVITE requests allow mid-dialog offer/answer and are forwarded to the other leg
+        if (request.Method == SipMethod.Invite)
+        {
+            _logger.LogDebug(
+                "re-INVITE request for dialog {CallId} forwarded to other leg",
+                callId);
+            return request;  // re-INVITE is forwarded to other leg
+        }
+
+        // Other in-dialog requests (to be implemented)
+        _logger.LogDebug(
+            "In-dialog {Method} request for dialog {CallId} not yet handled",
+            request.Method, callId);
+
+        return null;  // Placeholder: not forwarding other methods yet
+    }
 }
