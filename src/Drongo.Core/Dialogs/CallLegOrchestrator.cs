@@ -234,6 +234,16 @@ public sealed class CallLegOrchestrator : ICallLegOrchestrator
             return request;  // re-INVITE is forwarded to other leg
         }
 
+        // Per RFC 3262 Section 4:
+        // PRACK requests are forwarded to the other leg to acknowledge provisional responses
+        if (request.Method == SipMethod.Prack)
+        {
+            _logger.LogDebug(
+                "PRACK request for dialog {CallId} forwarded to other leg",
+                callId);
+            return request;  // PRACK is forwarded to other leg
+        }
+
         // Other in-dialog requests (to be implemented)
         _logger.LogDebug(
             "In-dialog {Method} request for dialog {CallId} not yet handled",
